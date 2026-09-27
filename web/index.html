@@ -60,6 +60,16 @@
           <div><dt>Premier mot du LLM</dt><dd id="lat-llm">–</dd></div>
         </dl>
       </section>
+      <section class="context">
+        <h2>Contexte du LLM</h2>
+        <div class="context-bar" id="ctx-bar" role="meter" aria-label="Remplissage du contexte du LLM"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+             title="Consignes du prof, mémoire des séances passées et conversation en cours. Quand c'est plein, le prof oublie la plus ancienne moitié de la conversation.">
+          <span id="ctx-fill"></span>
+        </div>
+        <p class="context-text" id="ctx-text">–</p>
+        <p class="context-note" id="ctx-note" hidden></p>
+      </section>
     </aside>
   </main>
 

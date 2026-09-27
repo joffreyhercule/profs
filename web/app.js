@@ -107,6 +107,21 @@ async function loadRecurring() {
   }
 }
 
+function showContext(ev) {
+  const pct = Math.min(100, Math.round((100 * ev.used) / ev.max));
+  const bar = $("ctx-bar");
+  $("ctx-fill").style.width = `${pct}%`;
+  bar.setAttribute("aria-valuenow", pct);
+  bar.classList.toggle("full", pct >= 85);
+  const n = (v) => v.toLocaleString("fr-FR");
+  $("ctx-text").textContent = `${n(ev.used)} / ${n(ev.max)} tokens · ${pct} %`;
+  const note = $("ctx-note");
+  note.hidden = !ev.trims;
+  note.textContent = ev.trims === 1
+    ? "Conversation coupée une fois : le prof a oublié la plus ancienne moitié."
+    : `Conversation coupée ${ev.trims} fois : le prof n’en garde que la partie récente.`;
+}
+
 function showLatency(lat) {
   const ms = (v) => (v === undefined ? "–" : `${v} ms`);
   $("lat-audio").textContent = ms(lat.first_audio);
@@ -383,6 +398,9 @@ function onEvent(ev) {
       state.player?.port.postMessage({ type: "flush" });
       state.playing = false;
       state.teacherLines.get(ev.turn)?.classList.add("interrupted");
+      break;
+    case "context":
+      showContext(ev);
       break;
     case "metrics":
       showLatency(ev.latency_ms);

@@ -139,6 +139,7 @@ class Session:
                                    mcfg["mastered_after_sessions"])
         self.system = self.subject.system_prompt(self.memory, self.db.get_user(user_id)["name"])
         self.history: list[dict] = []
+        self.trims = 0  # coupes de l'historique depuis le début de la séance
         self.need_prime = False
         self.mode = "handsfree"
         self.vad = SileroVAD()
@@ -163,6 +164,16 @@ class Session:
     def send(self, msg) -> None:
         self.out.put_nowait(msg)
 
+    def send_context(self, used: int) -> None:
+        """Remplissage du contexte du LLM (consignes, mémoire, historique), affiché dans la page."""
+        self.send({"type": "context", "used": used, "max": self.cfg["llm"]["ctx"], "trims": self.trims})
+
+    async def prime(self) -> None:
+        """Met en cache le préfixe du prochain tour pendant un temps mort, et publie sa taille."""
+        used = await self.eng.llm.prime_prompt(self.prompt(""))
+        if used:
+            self.send_context(used)
+
     async def _writer(self) -> None:
         while True:
             msg = await self.out.get()
@@ -176,7 +187,7 @@ class Session:
         self.send({"type": "hello", "teacher": self.subject.teacher, "subject": self.subject.id,
                    "memory": self.memory})
         # prefill du system prompt + mémoire pendant que l'élève lit la page : la salutation part vite
-        run_in_background(self.eng.llm.prime_prompt(self.prompt("")))
+        run_in_background(self.prime())
         try:
             while True:
                 msg = await self.ws.receive()
@@ -234,7 +245,7 @@ class Session:
                 self.live = None
                 if self.need_prime:
                     self.need_prime = False
-                    run_in_background(self.eng.llm.prime_prompt(self.prompt("")))
+                    run_in_background(self.prime())
         elif kind == "end_session":
             await self.finish()
 
@@ -508,6 +519,8 @@ class Session:
         self.db.add_metrics(self.session_id, {"turn": turn.id, **lat})
         self.send({"type": "metrics", "turn": turn.id, "latency_ms": lat})
         self.trim_history(turn.ctx_tokens)
+        if turn.ctx_tokens:  # après une coupe, la jauge redescend au réchauffage du cache (prime)
+            self.send_context(turn.ctx_tokens)
 
     @staticmethod
     def interrupted_reply(turn: Turn, said: str) -> str:
@@ -546,6 +559,7 @@ class Session:
         while cut < len(self.history) and self.history[cut]["role"] != "user":
             cut += 1
         del self.history[:cut]
+        self.trims += 1
         self.need_prime = True
 
     async def finish(self) -> None:

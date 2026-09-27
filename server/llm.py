@@ -128,11 +128,14 @@ class LLMClient:
                         usage["tokens"] = data["tokens_evaluated"] + data.get("tokens_predicted", 0)
                     return
 
-    async def prime_prompt(self, prompt: str) -> None:
+    async def prime_prompt(self, prompt: str) -> int | None:
+        """Met le prompt en cache sans rien générer ; renvoie sa taille en tokens (contexte occupé)."""
         try:
-            await self.http.post(self.completion_url, json={"prompt": prompt, "n_predict": 0, "cache_prompt": True})
-        except httpx.HTTPError as exc:
+            resp = await self.http.post(self.completion_url, json={"prompt": prompt, "n_predict": 0, "cache_prompt": True})
+            return resp.json().get("tokens_evaluated")
+        except (httpx.HTTPError, ValueError) as exc:
             log.warning("Préchauffage du cache LLM impossible : %s", exc)
+            return None
 
     def _body(self, messages: list[dict], max_tokens: int | None, stream: bool) -> dict:
         return {

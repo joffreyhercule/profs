@@ -318,6 +318,24 @@ button:focus-visible {
 .latency dd { margin: 0; font-variant-numeric: tabular-nums; }
 .latency #lat-audio { font-weight: 700; color: var(--ink); }
 
+.context-bar {
+  height: 8px;
+  margin: 2px 0 6px;
+  border: 1px solid var(--rule-major);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.context-bar span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--ink);
+  transition: width 0.4s ease;
+}
+.context-bar.full span { background: var(--pen); }   /* bientôt la coupe de l'historique */
+.context-text { margin: 0; font-variant-numeric: tabular-nums; }
+.context-note { margin: 4px 0 0; color: var(--muted); font-size: 15px; }
+
 /* --- micro ------------------------------------------------------------------------ */
 .mic-bar {
   display: flex;

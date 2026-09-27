@@ -77,7 +77,7 @@ class FakeLLM:
         return '{"summary": "Bonne séance.", "level": "B1", "notes": "Practise past simple."}'
 
     async def prime_prompt(self, prompt):
-        pass
+        return 800  # taille du préfixe mis en cache, comme tokens_evaluated
 
 
 class FakeSmartTurn:
@@ -254,3 +254,8 @@ async def test_history_is_halved_when_next_turn_would_not_fit_in_llm_context(set
         sizes.append(len(session.history))
     assert sizes == [2, 4, 2]  # les deux premiers échanges sont retirés d'un coup
     assert session.history[0]["role"] == "user" and not session.need_prime  # cache réchauffé après « played »
+    # la page affiche le remplissage après chaque tour, puis la jauge redescend au réchauffage du cache
+    await settle(0.05)
+    gauge =[(e["used"], e["trims"]) for e in ws.events("context")]
+    assert gauge == [(1000, 0), (1000, 0), (ctx - 500, 1), (800, 1)]
+    assert all(e["max"] == ctx for e in ws.events("context"))
