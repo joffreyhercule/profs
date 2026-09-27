@@ -4,8 +4,10 @@ Charge et préchauffe tous les modèles une seule fois (ils restent résidents),
 puis sert la page web et le WebSocket /ws.
 """
 
+import hashlib
 import logging
 import os
+import re
 import time
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
@@ -13,6 +15,7 @@ from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, WebSocket
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -79,6 +82,39 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+WEB = ROOT / "web"
+_ASSET_REF = re.compile(r'((?:src|href)=")([\w-]+\.(?:js|css))(")')
+
+
+def web_version() -> str:
+    """Empreinte du contenu de web/ : elle change dès qu'un fichier de la page change."""
+    digest = hashlib.sha1()
+    for path in sorted(WEB.iterdir()):
+        if path.is_file() and path.name != "index.html":
+            digest.update(path.name.encode() + path.read_bytes())
+    return digest.hexdigest()[:10]
+
+
+@app.middleware("http")
+async def cache_policy(request, call_next):
+    """Fichiers versionnés (?v=empreinte) : en cache pour de bon, leur contenu ne change jamais à cette
+    adresse. Le reste (page, API) : le navigateur redemande à chaque fois, sinon il garde une vieille page."""
+    response = await call_next(request)
+    if "v" in request.query_params:
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    else:
+        response.headers.setdefault("Cache-Control", "no-cache")
+    return response
+
+
+@app.get("/", include_in_schema=False)
+@app.get("/index.html", include_in_schema=False)
+def index() -> HTMLResponse:
+    """La page, avec ses fichiers versionnés (app.js?v=…) ; app.js propage l'empreinte aux worklets."""
+    html = (WEB / "index.html").read_text(encoding="utf-8")
+    return HTMLResponse(_ASSET_REF.sub(rf"\g<1>\g<2>?v={web_version()}\g<3>", html))
+
+
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket, user: int, subject: str) -> None:
     eng = state["engines"]
@@ -138,7 +174,7 @@ def stats(user: int, subject: str) -> dict:
             "profile": db.get_profile(user, subject), "vram_gb": vram_used_gb()}
 
 
-app.mount("/", StaticFiles(directory=ROOT / "web", html=True), name="web")
+app.mount("/", StaticFiles(directory=WEB, html=True), name="web")
 
 
 def main() -> None:

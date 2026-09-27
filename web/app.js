@@ -3,6 +3,11 @@
 
 const $ = (id) => document.getElementById(id);
 
+// Le serveur ajoute l'empreinte de web/ à l'adresse de ce script (app.js?v=…) ; on la propage aux
+// worklets, pour que le navigateur recharge aussi leur nouvelle version.
+const VERSION = new URL(import.meta.url).searchParams.get("v");
+const versioned = (file) => (VERSION ? `${file}?v=${VERSION}` : file);
+
 const state = {
   ws: null,
   mode: "handsfree",
@@ -117,9 +122,7 @@ function showContext(ev) {
   $("ctx-text").textContent = `${n(ev.used)} / ${n(ev.max)} tokens · ${pct} %`;
   const note = $("ctx-note");
   note.hidden = !ev.trims;
-  note.textContent = ev.trims === 1
-    ? "Conversation coupée une fois : le prof a oublié la plus ancienne moitié."
-    : `Conversation coupée ${ev.trims} fois : le prof n’en garde que la partie récente.`;
+  note.textContent = `· début oublié ${ev.trims === 1 ? "une fois" : `${ev.trims} fois`}`;
 }
 
 function showLatency(lat) {
@@ -436,8 +439,8 @@ async function startSession() {
     });
     const micCtx = new AudioContext({ latencyHint: "interactive" });
     const playCtx = new AudioContext({ sampleRate: 24000, latencyHint: "interactive" });
-    await micCtx.audioWorklet.addModule("mic-worklet.js");
-    await playCtx.audioWorklet.addModule("player-worklet.js");
+    await micCtx.audioWorklet.addModule(versioned("mic-worklet.js"));
+    await playCtx.audioWorklet.addModule(versioned("player-worklet.js"));
 
     const mic = new AudioWorkletNode(micCtx, "mic-processor");
     const mute = micCtx.createGain();

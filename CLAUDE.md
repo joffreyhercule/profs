@@ -35,7 +35,7 @@ Contraintes d'exécution :
 
 ## Architecture
 
-Deux processus : le serveur Python (`server/main.py`, FastAPI) et `llama-server` (llama.cpp CUDA, binaires dans `tools/llama.cpp/`) qu'il lance. Le navigateur envoie des blocs PCM16 16 kHz de 512 échantillons (32 ms) par WebSocket `/ws?user=<id>&subject=<matière>` et reçoit l'audio du prof en binaire : en-tête `struct <II` (tour, segment) + PCM16 24 kHz, plus des événements JSON. La page connecte le WebSocket dès que profil et matière sont choisis (préchauffage du cache LLM) ; la séance en base n'est créée qu'au message `start`, et supprimée à la fin si l'élève n'a rien dit.
+Deux processus : le serveur Python (`server/main.py`, FastAPI) et `llama-server` (llama.cpp CUDA, binaires dans `tools/llama.cpp/`) qu'il lance. Le navigateur envoie des blocs PCM16 16 kHz de 512 échantillons (32 ms) par WebSocket `/ws?user=<id>&subject=<matière>` et reçoit l'audio du prof en binaire : en-tête `struct <II` (tour, segment) + PCM16 24 kHz, plus des événements JSON. La page est servie par `index()` (`server/main.py`) : ses fichiers portent l'empreinte de `web/` (`app.js?v=…`, en cache immuable) et la page elle-même est en `no-cache` ; un nouveau fichier chargé par le JS doit passer par `versioned()` (`web/app.js`), sinon le navigateur en garde une vieille version. La page connecte le WebSocket dès que profil et matière sont choisis (préchauffage du cache LLM) ; la séance en base n'est créée qu'au message `start`, et supprimée à la fin si l'élève n'a rien dit.
 
 ### Matières et profils
 

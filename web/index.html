@@ -60,16 +60,6 @@
           <div><dt>Premier mot du LLM</dt><dd id="lat-llm">–</dd></div>
         </dl>
       </section>
-      <section class="context">
-        <h2>Contexte du LLM</h2>
-        <div class="context-bar" id="ctx-bar" role="meter" aria-label="Remplissage du contexte du LLM"
-             aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
-             title="Consignes du prof, mémoire des séances passées et conversation en cours. Quand c'est plein, le prof oublie la plus ancienne moitié de la conversation.">
-          <span id="ctx-fill"></span>
-        </div>
-        <p class="context-text" id="ctx-text">–</p>
-        <p class="context-note" id="ctx-note" hidden></p>
-      </section>
     </aside>
   </main>
 
@@ -78,6 +68,14 @@
       <span class="mic-level" id="mic-level"></span>
     </button>
     <p class="mic-hint" id="mic-hint">Maintiens Espace pour parler à tout moment. Échap coupe ton prof.</p>
+    <div class="context"
+         title="Consignes du prof, mémoire des séances passées et conversation en cours. Quand c'est plein, le prof oublie la plus ancienne moitié de la conversation.">
+      <span class="context-label">Contexte du LLM</span>
+      <div class="context-bar" id="ctx-bar" role="meter" aria-label="Remplissage du contexte du LLM"
+           aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="ctx-fill"></span></div>
+      <span class="context-text" id="ctx-text">–</span>
+      <span class="context-note" id="ctx-note" hidden></span>
+    </div>
   </footer>
 
   <script src="app.js" type="module"></script>
