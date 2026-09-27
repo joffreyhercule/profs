@@ -1,0 +1,81 @@
+# Leçon du programme de botanique. Format : voir server/lessons.py (Lesson.from_plan).
+title: "La circulation de la sève"
+summary: "Les deux sèves de la plante : ce qu'elles transportent, par quels vaisseaux, dans quel sens, et ce qui les fait circuler."
+
+sections:
+  - title: "Deux sèves, deux réseaux"
+    points:
+      - "Une plante a deux sèves bien différentes, qui circulent dans deux réseaux de vaisseaux séparés."
+      - "La sève brute, faite d'eau et de sels minéraux puisés dans le sol, monte des racines vers les feuilles, dans les vaisseaux du xylème."
+      - "La sève élaborée, riche en sucres fabriqués par la photosynthèse, part surtout des feuilles et va vers toutes les parties qui en ont besoin, dans les vaisseaux du phloème."
+      - "Pour s'en souvenir : la sève brute arrive du sol sans avoir été transformée ; la sève élaborée a été élaborée par les feuilles."
+      - "La sève brute ne circule que dans un sens, vers le haut ; la sève élaborée va là où les sucres sont consommés ou stockés, donc vers le haut comme vers le bas."
+    check: "Laquelle des deux sèves transporte les sucres ?"
+
+  - title: "L'eau entre par les racines"
+    points:
+      - "L'eau entre dans la racine par les poils absorbants, attirée par les cellules de la racine, plus chargées en substances dissoutes que l'eau du sol : c'est l'osmose."
+      - "Avec l'eau, la racine prélève les sels minéraux : l'azote sous forme de nitrates, le phosphore et le potassium, les trois éléments des engrais N-P-K."
+      - "L'eau traverse ensuite les tissus de la racine jusqu'à son centre, où se trouvent les vaisseaux du xylème ; elle y forme la sève brute."
+      - "Les champignons des mycorhizes prolongent les racines de leurs filaments et augmentent beaucoup la quantité d'eau et de phosphore récupérée."
+      - "Un sol trop sec, trop salé, ou gorgé d'eau et privé d'oxygène, empêche les racines de fonctionner : la plante flétrit."
+    check: "Quels sont les trois éléments principaux des engrais ?"
+
+  - title: "Ce qui fait monter la sève brute"
+    points:
+      - "Le moteur principal est la transpiration : les feuilles perdent de la vapeur d'eau par leurs stomates, et cette perte aspire l'eau des vaisseaux, un peu comme une paille."
+      - "La colonne d'eau ne se rompt pas, car les molécules d'eau s'accrochent les unes aux autres : c'est la théorie de la tension et de la cohésion."
+      - "Ce mécanisme hisse l'eau jusqu'au sommet des plus grands arbres, à plus de 100 mètres pour les séquoias de Californie."
+      - "La capillarité ne suffit pas : dans des vaisseaux aussi fins, elle ne ferait monter l'eau que d'un mètre environ au mieux, bien loin de la hauteur d'un arbre."
+      - "La racine peut aussi pousser la sève vers le haut, surtout quand la plante transpire peu : c'est la poussée racinaire, qui explique les gouttelettes au bord des feuilles au petit matin et les pleurs de la vigne taillée au printemps."
+      - "En été, un grand arbre fait ainsi circuler plusieurs centaines de litres d'eau par jour, et plus de 95 pour cent de cette eau repart dans l'air par transpiration."
+    check: "Quel est le principal moteur de la montée de la sève brute ?"
+
+  - title: "Le xylème, c'est le bois"
+    points:
+      - "Les vaisseaux du xylème sont faits de cellules mortes, vidées de leur contenu et mises bout à bout pour former de longs tuyaux."
+      - "Leurs parois sont renforcées de lignine, une substance dure : l'ensemble du xylème, c'est le bois, qui soutient aussi l'arbre."
+      - "Chaque année, l'arbre ajoute une couche de bois : au printemps, un bois clair aux gros vaisseaux ; en été, un bois plus dense et plus foncé. Ces bandes forment les cernes, qui permettent de compter son âge."
+      - "Seul le bois récent, l'aubier, clair et proche de l'écorce, conduit la sève brute ; le cœur, ou duramen, souvent plus sombre, ne la conduit plus et sert de charpente."
+      - "C'est pourquoi un vieil arbre au tronc creux peut rester vivant : ce qui conduit la sève se trouve à la périphérie du tronc."
+    check: "Pourquoi un arbre au tronc creux peut-il continuer à vivre ?"
+
+  - title: "Le phloème et la sève élaborée"
+    points:
+      - "Le phloème, appelé aussi liber, est une fine couche située juste sous l'écorce ; ses vaisseaux, les tubes criblés, sont faits de cellules vivantes percées de pores, comme des cribles."
+      - "La sève élaborée va toujours d'une source, un organe qui produit ou libère des sucres, vers un puits, un organe qui en consomme ou en stocke."
+      - "En été, les sources sont les feuilles, et les puits sont les fruits, les jeunes pousses, les racines et les réserves du tronc : la sève élaborée monte vers les fruits et descend vers les racines."
+      - "Au printemps, avant la sortie des feuilles, l'arbre puise dans ses réserves d'amidon du tronc et des racines, transformées en sucres, pour faire éclore ses bourgeons : c'est pour cela que la sève de printemps du bouleau ou de l'érable est sucrée."
+      - "Si l'on retire un anneau d'écorce tout autour du tronc, on coupe le phloème : les racines ne reçoivent plus de sucres et l'arbre finit par mourir. C'est pour cela qu'on protège les jeunes troncs des chevreuils et des rongeurs."
+    check: "Pourquoi la sève élaborée peut-elle aller vers le haut comme vers le bas ?"
+
+  - title: "Les saisons de la sève"
+    points:
+      - "En été, la transpiration est forte : la sève brute monte vite aux heures chaudes de la journée, et ralentit la nuit."
+      - "En automne, les arbres caducs récupèrent une partie de l'azote et des sucres de leurs feuilles avant de les laisser tomber, et les mettent en réserve dans le tronc et les racines."
+      - "En hiver, sans feuilles, la transpiration cesse presque : la sève brute ne circule quasiment plus, et le gel peut former des bulles d'air qui bloquent certains vaisseaux."
+      - "Au printemps, la montée de sève reprend, d'abord avec la poussée racinaire, puis avec la transpiration des nouvelles feuilles."
+      - "Entre l'écorce et le bois, une fine couche de cellules, le cambium, fabrique chaque année du bois vers l'intérieur et du liber vers l'extérieur : c'est lui qui fait grossir le tronc."
+    check: "Pourquoi la sève brute ne circule-t-elle presque plus en hiver chez un arbre caduc ?"
+
+quiz:
+  - question: "Que contient la sève brute ?"
+    answer: "De l'eau et des sels minéraux puisés dans le sol."
+  - question: "Dans quels vaisseaux circule la sève brute ?"
+    answer: "Dans le xylème, c'est-à-dire le bois."
+  - question: "Dans quel sens circule la sève brute ?"
+    answer: "Vers le haut, des racines vers les feuilles."
+  - question: "Où la sève élaborée se charge-t-elle surtout, et que contient-elle ?"
+    answer: "Dans les feuilles ; elle contient les sucres fabriqués par la photosynthèse."
+  - question: "Quel est le principal moteur de la montée de la sève brute ?"
+    answer: "La transpiration des feuilles, qui aspire l'eau (tension et cohésion)."
+  - question: "Pourquoi la capillarité ne suffit-elle pas à faire monter la sève dans un arbre ?"
+    answer: "Elle ne fait monter l'eau que d'un mètre environ au mieux."
+  - question: "Quelle partie du bois conduit encore la sève brute ?"
+    answer: "L'aubier, le bois récent proche de l'écorce."
+  - question: "Comment s'appellent les vaisseaux du phloème ?"
+    answer: "Les tubes criblés ; le phloème s'appelle aussi le liber."
+  - question: "Pourquoi un arbre meurt-il si l'on retire un anneau d'écorce tout autour du tronc ?"
+    answer: "On coupe le phloème : les racines ne reçoivent plus de sucres."
+  - question: "Quelle couche fait grossir le tronc chaque année ?"
+    answer: "Le cambium."

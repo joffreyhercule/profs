@@ -5,6 +5,7 @@ puis sert la page web et le WebSocket /ws.
 """
 
 import hashlib
+import json
 import logging
 import os
 import re
@@ -21,6 +22,7 @@ from pydantic import BaseModel, Field
 
 from server import health
 from server.config import ROOT, load_config, resolve
+from server.lessons import GENERATED
 from server.llm import LlamaServer, LLMClient
 from server.memory.db import MemoryDB
 from server.pipeline import Engines, Session
@@ -132,6 +134,39 @@ class UserIn(BaseModel):
 @app.get("/api/subjects")
 def subjects() -> list[dict]:
     return [s.public() for s in state["engines"].subjects.values()]
+
+
+@app.get("/api/lessons")
+def lessons(user: int, subject: str) -> dict:
+    """Le programme de la matière, où en est l'élève dans chaque leçon, et ses leçons à la carte."""
+    eng = state["engines"]
+    subj = eng.subjects.get(subject)
+    if subj is None or not subj.lesson:
+        return {"enabled": False}
+    runs = {r["lesson_key"]: r for r in eng.db.lesson_runs(user, subject)}
+
+    def status(key: str, n_questions: int) -> dict:
+        run = runs.get(key)
+        if run is None:
+            return {"status": "todo"}
+        results = json.loads(run["results"] or "{}")
+        score = f"{sum(results.values())}/{n_questions}"
+        if run["done"]:
+            return {"status": "done", "score": score}
+        where = f"question {run['question']} du quiz" if run["question"] else f"partie {run['section']}"
+        return {"status": "done" if run["ever_done"] else "started", "resume": where}
+
+    program = [{**lesson.public(), **status(lesson.key, len(lesson.quiz))} for lesson in subj.lessons]
+    upcoming = next((p for p in program if p["status"] != "done"), None)
+    generated = []
+    for key, run in runs.items():
+        if key.startswith(GENERATED):
+            plan = json.loads(run["plan"])
+            generated.append({"key": key, "title": run["title"], "summary": plan.get("summary", ""),
+                              "sections": [s["title"] for s in plan["sections"]], "questions": len(plan["quiz"]),
+                              "date": run["updated_at"][:10], **status(key, len(plan["quiz"]))})
+    return {"enabled": True, "program": program, "next": upcoming["key"] if upcoming else None,
+            "generated": generated}
 
 
 @app.get("/api/users")

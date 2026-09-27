@@ -27,6 +27,10 @@ const state = {
   pttDown: false,
   started: false,
   fixCount: 0,
+  courses: null,   // programme et leçons à la carte de l'élève (/api/lessons)
+  course: null,    // cours choisi : {choice: "lesson", key} | {choice: "generate", theme} | {choice: "free"}
+  plan: null,      // plan confirmé par le serveur (événement lesson_plan), avec l'avancement
+  previous: null,  // choix et plan d'avant, rétablis si la leçon à la carte échoue
 };
 
 // --- affichage --------------------------------------------------------------------
@@ -133,6 +137,164 @@ function showLatency(lat) {
 }
 
 // --- WebSocket ----------------------------------------------------------------------
+// --- cours et leçons (matières qui en proposent) ------------------------------------------
+const currentSubject = () => state.subjects.find((s) => s.id === state.subject);
+const offersCourses = () => !!currentSubject()?.lessons && state.courses?.enabled !== false;
+const lessonLabel = (lesson) => (lesson.number ? `Leçon ${lesson.number}` : "Leçon à la carte");
+
+async function loadCourses() {
+  state.plan = null;
+  if (!currentSubject()?.lessons) {
+    state.courses = null;
+    $("course").hidden = true;
+    updateStart();
+    return;
+  }
+  try {
+    state.courses = await getJson(`/api/lessons?user=${state.userId}&subject=${encodeURIComponent(state.subject)}`);
+  } catch {
+    state.courses = { enabled: false };
+  }
+  if (!state.courses.enabled) {
+    $("course").hidden = true;
+    updateStart();
+    return;
+  }
+  // par défaut, la leçon suivante du programme ; un choix encore valable pour ce profil est gardé
+  const keys = [...state.courses.program, ...state.courses.generated].map((l) => l.key);
+  const kept = state.course?.choice === "free" || (state.course?.choice === "lesson" && keys.includes(state.course.key));
+  if (!kept) {
+    const key = state.courses.next || state.courses.program[0]?.key;
+    state.course = key ? { choice: "lesson", key } : { choice: "free" };
+  }
+  $("course").hidden = false;
+  renderCourses();
+  renderPlan();
+  updateStart();
+  sendCourse();
+}
+
+function lessonBadge(lesson) {
+  if (lesson.status === "done") return { cls: "done", text: lesson.score ? `✓ ${lesson.score}` : "✓ Terminée" };
+  if (lesson.status === "started") return { cls: "started", text: `À reprendre · ${lesson.resume}` };
+  if (lesson.key === state.courses.next) return { cls: "next", text: "Suivante" };
+  return { cls: "", text: "" };
+}
+
+function lessonButton(lesson) {
+  const pick = document.createElement("button");
+  pick.type = "button";
+  pick.className = "choice lesson";
+  pick.setAttribute("aria-pressed", String(state.course?.choice === "lesson" && state.course.key === lesson.key));
+  const badge = lessonBadge(lesson);
+  pick.innerHTML = `<span class="lesson-num" aria-hidden="true">${lesson.number ?? "✎"}</span>`
+    + `<span class="lesson-title">${escapeHtml(lesson.title)}</span>`
+    + `<span class="lesson-badge ${badge.cls}">${escapeHtml(badge.text)}</span>`;
+  pick.title = lesson.summary || "";
+  pick.onclick = () => chooseCourse({ choice: "lesson", key: lesson.key });
+  const li = document.createElement("li");
+  li.append(pick);
+  return li;
+}
+
+function renderCourses() {
+  const { program, generated } = state.courses;
+  $("program").replaceChildren(...program.map(lessonButton));
+  $("generated").replaceChildren(...generated.map(lessonButton));
+  $("generated-title").hidden = !generated.length;
+  $("free").setAttribute("aria-pressed", String(state.course?.choice === "free"));
+  $("theme-form").classList.toggle("selected", state.course?.choice === "generate");
+}
+
+function renderPlan(error = "") {
+  const box = $("plan");
+  const course = state.course;
+  const lesson = state.plan?.lesson;
+  let html = error ? `<p class="plan-error">${escapeHtml(error)}</p>` : "";
+  if (course?.choice === "generate" && !state.plan) {
+    html += `<p class="writing">${escapeHtml(state.teacher)} prépare ta leçon sur « ${escapeHtml(course.theme)} », `
+      + "une trentaine de secondes</p>";
+  } else if (lesson) {
+    if (state.plan.resume) html += `<p class="plan-resume">Tu reprends à ${escapeHtml(state.plan.resume)}.</p>`;
+    html += `<h4>${lessonLabel(lesson)} : ${escapeHtml(lesson.title)}</h4>`
+      + (lesson.summary ? `<p class="plan-summary">${escapeHtml(lesson.summary)}</p>` : "")
+      + `<ol>${lesson.sections.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ol>`
+      + `<p class="plan-meta">Puis un quiz de ${lesson.questions} questions · une trentaine de minutes en tout</p>`;
+  } else if (course?.choice === "lesson" && !state.plan) {
+    html += '<p class="writing">Préparation du plan</p>';
+  }
+  box.innerHTML = html;
+  box.hidden = !html;
+}
+
+function chooseCourse(course) {
+  if (state.started) return;
+  if (state.plan) state.previous = { course: state.course, plan: state.plan };
+  state.course = course;
+  state.plan = null;
+  renderCourses();
+  renderPlan();
+  updateStart();
+  sendCourse();
+}
+
+function sendCourse() {
+  if (state.course) send({ type: "lesson", ...state.course });
+}
+
+function updateStart() {
+  const btn = $("start");
+  if (!btn) return; // l'écran d'accueil a disparu : la séance a commencé
+  const lesson = state.plan?.lesson;
+  if (!offersCourses()) btn.textContent = "Commencer la séance";
+  else if (state.course?.choice === "free") btn.textContent = "Commencer la discussion";
+  else btn.textContent = lesson && state.plan.resume ? "Reprendre la leçon" : "Commencer la leçon";
+  // avec des leçons, on attend que le serveur ait le plan en main : sinon la séance partirait sans lui
+  btn.disabled = state.started || state.ws?.readyState !== WebSocket.OPEN || (offersCourses() && !state.plan);
+}
+
+function renderLessonPanel() {
+  const lesson = state.plan?.lesson;
+  const panel = $("lesson-panel");
+  panel.hidden = !lesson || !state.started;
+  if (panel.hidden) return;
+  const p = state.plan.progress;
+  const inQuiz = p.question > 0;
+  $("lesson-kicker").textContent = lessonLabel(lesson) + (p.done ? " · terminée" : "");
+  $("lesson-name").textContent = lesson.title;
+  $("lesson-steps").replaceChildren(...lesson.sections.map((title, i) => {
+    const li = document.createElement("li");
+    li.textContent = title;
+    const n = i + 1;
+    if (!inQuiz && n === p.section) {
+      li.className = "current";
+      li.setAttribute("aria-current", "step");
+    } else if (inQuiz || n <= p.reached) {
+      li.className = "done";
+    }
+    return li;
+  }));
+  $("lesson-quiz").classList.toggle("current", inQuiz && !p.done);
+  $("quiz-dots").replaceChildren(...Array.from({ length: p.questions }, (_, i) => {
+    const q = String(i + 1);
+    const result = p.results[q];
+    const li = document.createElement("li");
+    li.className = result === true ? "right" : result === false ? "wrong" : (i + 1 === p.question && !p.done ? "asked" : "");
+    li.title = result === undefined ? `Question ${q}` : `Question ${q} : ${result ? "juste" : "à revoir"}`;
+    return li;
+  }));
+  const answered = Object.keys(p.results).length;
+  $("quiz-score").textContent = answered ? `${p.score}/${answered}` : "";
+}
+
+function lessonSummary(progress) {
+  const lesson = state.plan?.lesson;
+  if (!lesson || !progress) return "";
+  if (progress.done) return ` Leçon « ${lesson.title} » terminée : quiz ${progress.score}/${progress.questions}.`;
+  const where = progress.question ? `au quiz, question ${progress.question}` : `à la partie ${progress.reached}`;
+  return ` Leçon « ${lesson.title} » : tu reprendras ${where} la prochaine fois.`;
+}
+
 function send(obj) {
   if (state.ws && state.ws.readyState === WebSocket.OPEN) state.ws.send(JSON.stringify(obj));
 }
@@ -141,7 +303,11 @@ function connect() {
   const previous = state.ws;
   state.ws = null;
   previous?.close();
-  $("start").disabled = true;
+  updateStart();
+  if (!state.started) {
+    state.plan = null;
+    state.courses = null;
+  }
   if (!state.userId || !state.subject) return;
   const query = `user=${state.userId}&subject=${encodeURIComponent(state.subject)}`;
   const ws = new WebSocket(`ws://${location.host}/ws?${query}`);
@@ -150,7 +316,7 @@ function connect() {
   ws.onopen = () => {
     if (!state.started) {
       setStatus("Prêt à commencer");
-      $("start").disabled = false;
+      updateStart();
       return;
     }
     // reconnexion après un redémarrage du serveur : nouvelle séance, même page
@@ -163,12 +329,14 @@ function connect() {
     state.playing = false;
     $("mic").disabled = false;
     send({ type: "mode", value: state.mode });
+    // la leçon reprend là où elle en était (le serveur l'a enregistrée à chaque étape)
+    if (state.plan?.lesson) send({ type: "lesson", choice: "lesson", key: state.plan.lesson.key });
     send({ type: "start" });
   };
   ws.onclose = (ev) => {
     if (ws !== state.ws) return; // remplacée : changement de profil ou de matière
     $("mic").disabled = true;
-    $("start").disabled = true;
+    updateStart();
     if (state.ended) return;
     if (ev.code === 4404) {
       setStatus("Profil ou matière introuvable : recharge la page.");
@@ -349,6 +517,29 @@ function onEvent(ev) {
       state.teacher = ev.teacher;
       $("teacher-name").textContent = ev.teacher;
       loadRecurring();
+      if (!state.started) loadCourses();
+      break;
+    case "lesson_generating":
+      renderPlan();
+      break;
+    case "lesson_plan":
+      state.plan = ev;
+      state.previous = null;
+      renderCourses();
+      renderPlan();
+      updateStart();
+      break;
+    case "lesson_error":
+      // le serveur garde le choix d'avant : la page aussi
+      if (state.previous) ({ course: state.course, plan: state.plan } = state.previous);
+      state.previous = null;
+      renderCourses();
+      renderPlan(ev.message);
+      updateStart();
+      break;
+    case "lesson_progress":
+      if (state.plan?.lesson) state.plan.progress = ev;
+      renderLessonPanel();
       break;
     case "listening":
       if (!state.pendingUser) state.pendingUser = addLine("user pending", "Toi", "…");
@@ -412,7 +603,7 @@ function onEvent(ev) {
       setStatus(ev.message);
       break;
     case "session_ended":
-      showSummary(ev.summary);
+      showSummary(ev.summary, ev.lesson);
       break;
   }
 }
@@ -463,16 +654,17 @@ async function startSession() {
   $("mic").disabled = false;
   $("end-session").disabled = false;
   state.started = true;
+  renderLessonPanel();
   send({ type: "mode", value: state.mode });
   send({ type: "start" });
   setStatus(`${state.teacher} réfléchit`, "thinking");
 }
 
-function showSummary(summary) {
+function showSummary(summary, lesson) {
   state.ended = true;
   $("mic").disabled = true;
   $("end-session").disabled = true;
-  const text = summary?.summary || "Séance enregistrée.";
+  const text = (summary?.summary || "Séance enregistrée.") + lessonSummary(lesson);
   const li = addLine("teacher-line", "Bilan", text + (summary?.level ? ` Niveau estimé : ${summary.level}.` : ""));
   const btn = document.createElement("button");
   btn.className = "start";
@@ -538,6 +730,12 @@ $("mic").addEventListener("pointerdown", pttDown);
 $("mic").addEventListener("pointerup", pttUp);
 $("mic").addEventListener("pointerleave", pttUp);
 $("start").addEventListener("click", startSession);
+$("free").addEventListener("click", () => chooseCourse({ choice: "free" }));
+$("theme-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const theme = $("theme").value.trim();
+  if (theme) chooseCourse({ choice: "generate", theme });
+});
 $("new-profile").addEventListener("submit", createProfile);
 $("end-session").addEventListener("click", () => {
   send({ type: "end_session" });

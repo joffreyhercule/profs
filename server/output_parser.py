@@ -5,6 +5,9 @@ Format attendu (parole d'abord, pour que le TTS démarre au plus tôt) :
     <say lang="fr">Presque ! On dit <en>I went</en>, pas "I goed".</say>
     <fix>[{"type": "conjugation", "original": "I goed", ...}]</fix>
 
+En leçon, une balise <lesson>{"section": 2}</lesson> entre </say> et <fix> dit où en est le prof
+(voir server/lessons.py).
+
 Le texte de <say> est découpé en segments (proposition ou changement de langue)
 envoyés au TTS au fil de l'eau ; le JSON de <fix> est lu à la fin.
 """
@@ -20,7 +23,7 @@ FIX_TYPES = ("grammar", "conjugation", "vocabulary", "word_order", "preposition"
 # on lui donne donc un type pour les ranger, et on les écarte : ni affichés, ni comptés en mémoire.
 TRANSCRIPTION = "transcription"
 _LANG_ATTR = re.compile(r"""lang\s*=\s*["']?(en|fr)""", re.IGNORECASE)
-_TAG = re.compile(r"</?\s*(say|fix|en|fr)\b[^>]*>", re.IGNORECASE)
+_TAG = re.compile(r"</?\s*(say|fix|en|fr|lesson)\b[^>]*>", re.IGNORECASE)
 _HARD_END = ".!?…"
 _SOFT_END = ",;:—"
 _CLOSE_QUOTES = "\"'»”)"
@@ -40,6 +43,7 @@ class ParsedReply:
     segments: list[Segment] = field(default_factory=list)
     fixes: list[dict] = field(default_factory=list)
     fix_parse_error: bool = False
+    lesson: dict | None = None  # balise <lesson> : où en est le prof dans sa leçon
 
 
 class ReplyParser:
@@ -54,6 +58,7 @@ class ReplyParser:
         self._seg = ""
         self._lang_stack: list[str] = [default_lang]
         self._fix_buf = ""
+        self._lesson_buf = ""
         self._display: list[str] = []
         self.reply = ParsedReply()
 
@@ -78,21 +83,36 @@ class ReplyParser:
             self._flush(segments)
         if self._fix_buf:
             self._parse_fixes()
+        if self._lesson_buf and self.reply.lesson is None:
+            self._parse_lesson()
         self.reply.lang = self._lang_stack[0]
         self.reply.say_text = "".join(self._display).strip()
         return segments, "".join(display)
 
     def _consume(self, segments: list[Segment], display: list[str], final: bool) -> None:
         while self._pending:
+            # On cherche la balise fermante dans tout le tampon : elle arrive souvent coupée entre deux
+            # morceaux du flux (« </les » puis « son> »).
             if self.state == "fix":
-                end = self._pending.lower().find("</fix>")
+                self._fix_buf += self._pending
+                end = self._fix_buf.lower().find("</fix>")
                 if end < 0:
-                    self._fix_buf += self._pending
                     self._pending = ""
                     return
-                self._fix_buf += self._pending[:end]
-                self._pending = self._pending[end + len("</fix>"):]
+                self._pending = self._fix_buf[end + len("</fix>"):]
+                self._fix_buf = self._fix_buf[:end]
                 self.state = "done"
+                continue
+            if self.state == "lesson":
+                self._lesson_buf += self._pending
+                end = self._lesson_buf.lower().find("</lesson>")
+                if end < 0:
+                    self._pending = ""
+                    return
+                self._pending = self._lesson_buf[end + len("</lesson>"):]
+                self._lesson_buf = self._lesson_buf[:end]
+                self.state = "post"
+                self._parse_lesson()  # tout de suite : un prof coupé par l'élève garde son avancement
                 continue
             if self.state == "done":
                 self._pending = ""
@@ -153,6 +173,11 @@ class ReplyParser:
                 if self.state in ("pre", "say"):
                     self._flush(segments)
                 self.state = "fix"
+        elif name == "lesson":
+            if not closing:
+                if self.state in ("pre", "say"):
+                    self._flush(segments)
+                self.state = "lesson"
         elif self.state in ("say", "pre"):
             self.state = "say"
             if closing:
@@ -235,6 +260,14 @@ class ReplyParser:
                 "explain_fr": str(it.get("explain_fr") or it.get("explanation") or ""),
             })
         self.reply.fixes = fixes
+
+    def _parse_lesson(self) -> None:
+        match = re.search(r"\{.*\}", self._lesson_buf, re.DOTALL)
+        try:
+            data = json.loads(match.group(0)) if match else None
+        except json.JSONDecodeError:
+            data = None
+        self.reply.lesson = data if isinstance(data, dict) else None
 
 
 _EN_WORDS = frozenset(

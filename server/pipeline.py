@@ -7,6 +7,7 @@ la fin de phrase (ou au bout de max_silence_ms), et annulé si l'élève reprend
 """
 
 import asyncio
+import copy
 import itertools
 import json
 import logging
@@ -21,6 +22,7 @@ import numpy as np
 from fastapi import WebSocket, WebSocketDisconnect
 
 from server import health
+from server.lessons import GENERATED, Lesson, LessonState, homophones, parse_generated
 from server.llm import LlamaServer, LLMClient
 from server.memory.db import MemoryDB
 from server.memory.profile import apply_summary, memory_block, summary_prompt
@@ -79,6 +81,7 @@ class Turn:
         self.raw = ""  # sortie brute du LLM, balises comprises
         self.ctx_tokens: int | None = None  # contexte du LLM occupé en fin de tour, compté par llama-server
         self.first_chunk = asyncio.Event()  # premier morceau audio produit par le TTS
+        self.llm_text: str | None = None  # message de l'élève tel que le lit le LLM (avec le repère de leçon)
         self.stt_future: asyncio.Future | None = None
         self.cancelled = self.interrupted = self.committed = self.finished = False
         self.history_entry: dict | None = None
@@ -137,7 +140,11 @@ class Session:
         mcfg = self.cfg["memory"]
         self.memory = memory_block(self.db, user_id, subject, mcfg["top_errors"], mcfg["recent_sessions"],
                                    mcfg["mastered_after_sessions"])
-        self.system = self.subject.system_prompt(self.memory, self.db.get_user(user_id)["name"])
+        self.learner_name = self.db.get_user(user_id)["name"]
+        self.system = self.subject.system_prompt(self.memory, self.learner_name)
+        self.lesson: LessonState | None = None  # séance-leçon ; None : discussion libre
+        self.lesson_t0 = 0.0
+        self.lesson_request = 0  # dernier choix de cours reçu : une génération dépassée est ignorée
         self.history: list[dict] = []
         self.trims = 0  # coupes de l'historique depuis le début de la séance
         self.need_prime = False
@@ -213,8 +220,23 @@ class Session:
         if kind == "start" and not self.started:
             self.started = True
             self.session_id = self.db.start_session(self.user_id, self.subject.id)
-            turn = self.launch(None, now, held=False, user_text=self.subject.greeting)
+            greeting = self.subject.greeting
+            if self.lesson is not None:
+                self.lesson_request += 1  # le cours est fixé : une génération encore en cours est ignorée
+                self.lesson_t0 = time.perf_counter()
+                lesson = self.lesson.lesson
+                self.db.start_lesson_run(self.session_id, self.user_id, self.subject.id, lesson.key, lesson.title,
+                                         lesson.plan(), self.lesson.row())
+                greeting = self.lesson_greeting()
+            turn = self.launch(None, now, held=False, user_text=greeting)
             self.live = turn
+        elif kind == "lesson" and not self.started:
+            # une leçon à la carte s'écrit en ~30 s : en tâche de fond. Le reste est immédiat, pour qu'un
+            # « start » envoyé juste après (reconnexion en pleine leçon) trouve la leçon en place.
+            if msg.get("choice") == "generate":
+                run_in_background(self.choose_lesson(msg))
+            else:
+                await self.choose_lesson(msg)
         elif kind == "mode":
             self.mode = msg.get("value", "handsfree")
             if self.mode != "handsfree" and not self.ptt:
@@ -377,6 +399,93 @@ class Session:
         turn.finished = turn.cancelled = True  # plus aucun message de ce tour
         self.live = None
 
+    # --- leçons ------------------------------------------------------------------------
+    async def choose_lesson(self, msg: dict) -> None:
+        """Choix du cours sur l'écran d'accueil : leçon du programme ou déjà suivie (key), leçon à la carte
+        (theme) ou discussion libre. Les consignes, plan compris, sont refaites et remises en cache avant
+        que l'élève commence."""
+        self.lesson_request += 1
+        request = self.lesson_request
+        choice = msg.get("choice")
+        try:
+            if not self.subject.lesson or choice == "free":
+                state = None
+            elif choice == "generate":
+                theme = " ".join(str(msg.get("theme", "")).split())[:120]
+                if not theme:
+                    return
+                self.send({"type": "lesson_generating", "theme": theme})
+                state = LessonState(await self.generate_lesson(theme))
+            else:
+                state = self.lesson_state(str(msg.get("key", "")))
+        except Exception:
+            log.exception("Leçon impossible à préparer")
+            if request == self.lesson_request and not self.started:
+                self.send({"type": "lesson_error", "message": f"{self.subject.teacher} n'a pas réussi à préparer "
+                                                              "cette leçon : réessaie, ou choisis un autre thème."})
+            return
+        if request != self.lesson_request or self.started:
+            return  # l'élève a choisi autre chose entre-temps, ou a déjà commencé
+        self.lesson = state
+        self.system = self.subject.system_prompt(self.memory, self.learner_name, state.lesson if state else None)
+        self.send({"type": "lesson_plan", "lesson": state.lesson.public() if state else None,
+                   "resume": state.resume_point() if state else None,
+                   "progress": state.progress() if state else None})
+        run_in_background(self.prime())
+
+    def lesson_state(self, key: str) -> LessonState:
+        """Leçon du programme, ou leçon générée déjà suivie (son plan n'existe qu'en base) ; une leçon
+        interrompue reprend là où l'élève s'était arrêté."""
+        run = self.db.last_lesson_run(self.user_id, self.subject.id, key)
+        lesson = self.subject.find_lesson(key)
+        if lesson is None and run is not None:
+            lesson = Lesson.from_plan(key, json.loads(run["plan"]))
+        if lesson is None:
+            raise KeyError(f"leçon inconnue : {key}")
+        if run is not None and not run["done"]:
+            return LessonState.resumed(lesson, run)
+        return LessonState(lesson)
+
+    async def generate_lesson(self, theme: str) -> Lesson:
+        """Leçon à la carte : le LLM écrit le plan (parties, notions, quiz) avant la séance, hors chemin critique."""
+        profile = self.db.get_profile(self.user_id, self.subject.id)
+        prompt = (self.subject.lesson["generate"].replace("{theme}", theme)
+                  .replace("{level}", profile.get("level") or "débutant")
+                  .replace("{notes}", profile.get("notes") or "(aucune)"))
+        out = await self.eng.llm.complete([{"role": "user", "content": prompt}], max_tokens=3000)
+        return Lesson.from_plan(GENERATED + time.strftime("%Y%m%d-%H%M%S"), parse_generated(out))
+
+    def lesson_greeting(self) -> str:
+        where = self.lesson.resume_point()
+        text = self.subject.lesson["resume"] if where else self.subject.lesson["greeting"]
+        return text.replace("{title}", self.lesson.lesson.title).replace("{where}", where or "")
+
+    def lesson_text(self, turn: Turn) -> str:
+        """Message de l'élève tel que le lit le LLM : en leçon, précédé d'un repère (partie, quiz, minutes)
+        qui garde le prof sur son plan, même après une coupe de l'historique."""
+        if self.lesson is None or turn.synthetic:
+            return turn.user_text
+        minutes = int((time.perf_counter() - self.lesson_t0) / 60)
+        tag = self.lesson.tag(minutes)
+        state = self.lesson
+        if state.question and not state.done:
+            # le LLM n'entend pas que « poêles » se prononce comme « poils » : on le lui dit
+            pairs = homophones(turn.user_text, state.lesson.quiz[state.question - 1]["answer"])
+            if pairs:
+                tag = tag[:-1] + " · " + " ; ".join(f"« {w} » se prononce comme « {e} »" for w, e in pairs) + "]"
+        return f"{tag} {turn.user_text}"
+
+    def quiz_score_sentence(self, reply) -> str | None:
+        """Phrase du score, dite par le serveur quand cette réponse termine le quiz : le LLM se trompe dans
+        ses additions (vu en vrai : 6 annoncé pour 7 bonnes réponses)."""
+        if self.lesson is None or self.lesson.done:
+            return None
+        preview = copy.deepcopy(self.lesson)
+        preview.apply(reply.lesson or {}, reply.say_text)
+        if not preview.done:
+            return None
+        return f"Ton score au quiz : {preview.score} sur {len(preview.lesson.quiz)}."
+
     # --- un tour de réponse ----------------------------------------------------------
     def launch(self, audio: np.ndarray | None, t_speech_end: float, held: bool,
                user_text: str | None = None, stt: asyncio.Future | None = None) -> Turn:
@@ -439,7 +548,8 @@ class Session:
             parser = ReplyParser(self.subject.lang, self.subject.fix_types)
             turn.reply = parser.reply  # rempli au fil du flux (langue dès <say>, corrections à la fin)
             turn.emit({"type": "assistant_start", "turn": turn.id})
-            prompt = self.prompt(turn.user_text)
+            turn.llm_text = self.lesson_text(turn)
+            prompt = self.prompt(turn.llm_text)
             lcfg = self.cfg["llm"]
             if await self.generate(turn, parser, prompt, lcfg.get("pause_after_first_segment", True)):
                 try:
@@ -453,6 +563,11 @@ class Session:
                 turn.emit({"type": "assistant_delta", "turn": turn.id, "text": display})
             for seg in segments:
                 self.speak(turn, seg)
+            score = self.quiz_score_sentence(parser.reply)
+            if score:
+                parser.reply.say_text += " " + score
+                turn.emit({"type": "assistant_delta", "turn": turn.id, "text": " " + score})
+                self.speak(turn, Segment(score, self.subject.lang))
             turn.reply = parser.reply
             turn.mark("llm_done")
             turn.emit({"type": "fixes", "turn": turn.id, "user_text": "" if turn.synthetic else turn.user_text,
@@ -504,7 +619,7 @@ class Session:
         turn.committed = True
         full = turn.reply.say_text if turn.reply else ""
         said = self.spoken_text(turn) if turn.interrupted else full
-        self._append("user", turn.user_text)
+        self._append("user", turn.llm_text or turn.user_text)
         if said:
             # le LLM relit ses réponses passées : elles doivent garder le format <say>/<fix>,
             # sinon il l'imite et l'abandonne
@@ -521,12 +636,18 @@ class Session:
         self.trim_history(turn.ctx_tokens)
         if turn.ctx_tokens:  # après une coupe, la jauge redescend au réchauffage du cache (prime)
             self.send_context(turn.ctx_tokens)
+        if self.lesson is not None and turn.reply is not None:
+            if self.lesson.apply(turn.reply.lesson or {}, turn.reply.say_text):
+                self.db.update_lesson_run(self.session_id, self.lesson.row())
+                self.send(self.lesson.progress())
 
     @staticmethod
     def interrupted_reply(turn: Turn, said: str) -> str:
         lang = turn.reply.lang if turn.reply else "en"
         fixes = json.dumps(turn.reply.fixes if turn.reply else [], ensure_ascii=False)
-        return f'<say lang="{lang}">{said} [interrupted]</say>\n<fix>{fixes}</fix>'
+        lesson = turn.reply.lesson if turn.reply else None
+        marker = f"\n<lesson>{json.dumps(lesson, ensure_ascii=False)}</lesson>" if lesson else ""
+        return f'<say lang="{lang}">{said} [interrupted]</say>{marker}\n<fix>{fixes}</fix>'
 
     def patch_interrupted(self, turn: Turn) -> None:
         said = self.spoken_text(turn)
@@ -582,4 +703,5 @@ class Session:
                 self.db.end_session(self.session_id)
         else:
             self.db.delete_session(self.session_id)  # l'élève n'a rien dit : rien à retenir
-        self.send({"type": "session_ended", "session_id": self.session_id, "summary": summary})
+        self.send({"type": "session_ended", "session_id": self.session_id, "summary": summary,
+                   "lesson": self.lesson.progress() if self.lesson else None})

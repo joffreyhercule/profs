@@ -25,6 +25,7 @@
     <section class="sheet" aria-label="Conversation">
       <ol class="conversation" id="conversation"></ol>
       <div class="welcome" id="welcome">
+        <div class="welcome-col">
         <section class="pick" aria-labelledby="pick-user">
           <h2 id="pick-user">Qui es-tu ?</h2>
           <ul class="choices" id="profiles"></ul>
@@ -38,12 +39,46 @@
           <h2 id="pick-subject">Avec qui veux-tu travailler ?</h2>
           <ul class="choices subjects" id="subjects"></ul>
         </section>
+        </div>
+        <div class="welcome-col">
+        <section class="pick course" id="course" aria-labelledby="pick-course" hidden>
+          <h2 id="pick-course">Quel cours aujourd'hui ?</h2>
+          <h3 class="course-group">Le programme</h3>
+          <ol class="lessons" id="program"></ol>
+          <h3 class="course-group" id="generated-title" hidden>Tes leçons à la carte</h3>
+          <ol class="lessons" id="generated"></ol>
+          <h3 class="course-group">Ou bien</h3>
+          <div class="course-other">
+            <form class="theme" id="theme-form">
+              <label for="theme">Une leçon à la carte</label>
+              <input id="theme" maxlength="120" autocomplete="off"
+                     placeholder="Un thème : champignons, lichens…">
+              <button type="submit">Préparer</button>
+            </form>
+            <button type="button" class="choice free" id="free" aria-pressed="false">
+              <span class="lesson-title">Discussion libre</span>
+              <span class="lesson-desc">sans programme, tu parles de ce que tu veux</span>
+            </button>
+          </div>
+          <div class="plan" id="plan" aria-live="polite" hidden></div>
+        </section>
         <button type="button" class="start" id="start" disabled>Commencer la séance</button>
         <p class="hint">Un casque évite que ton prof s'entende lui-même dans ton micro.</p>
+        </div>
       </div>
     </section>
 
     <aside class="margin-notes">
+      <section class="lesson-panel" id="lesson-panel" aria-label="Avancement de la leçon" hidden>
+        <p class="lesson-kicker" id="lesson-kicker"></p>
+        <h2 class="lesson-name" id="lesson-name"></h2>
+        <ol class="lesson-steps" id="lesson-steps"></ol>
+        <div class="quiz" id="lesson-quiz">
+          <span class="quiz-label">Quiz</span>
+          <ol class="quiz-dots" id="quiz-dots"></ol>
+          <span class="quiz-score" id="quiz-score"></span>
+        </div>
+      </section>
       <section>
         <h2>Corrections</h2>
         <ul class="fix-list" id="fix-list"><li class="empty">Aucune faute pour l'instant.</li></ul>

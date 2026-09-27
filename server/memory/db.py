@@ -86,7 +86,21 @@ CREATE TABLE IF NOT EXISTS metrics (
     data TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS lesson_runs (
+    session_id INTEGER PRIMARY KEY REFERENCES sessions(id),
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    subject TEXT NOT NULL,
+    lesson_key TEXT NOT NULL,        -- "programme:01-organes" ou "gen:…" (voir server/lessons.py)
+    title TEXT NOT NULL,
+    plan TEXT NOT NULL,              -- plan JSON : seule copie des leçons générées
+    section INTEGER NOT NULL DEFAULT 1,   -- partie la plus avancée atteinte
+    question INTEGER NOT NULL DEFAULT 0,  -- dernière question du quiz posée (0 : pas commencé)
+    results TEXT NOT NULL DEFAULT '{}',   -- {"1": true, "2": false, …}
+    done INTEGER NOT NULL DEFAULT 0,      -- quiz terminé
+    updated_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id, subject);
+CREATE INDEX IF NOT EXISTS lesson_runs_user ON lesson_runs(user_id, subject, lesson_key);
 """
 
 # Types de correction qui portent sur un mot ou un terme à retenir
@@ -180,7 +194,7 @@ class MemoryDB:
 
     def delete_session(self, session_id: int) -> None:
         """Séance ouverte puis quittée sans que l'élève ait parlé : rien à retenir."""
-        for table in ("errors", "turns", "metrics"):
+        for table in ("errors", "turns", "metrics", "lesson_runs"):
             self.conn.execute(f"DELETE FROM {table} WHERE session_id = ?", (session_id,))
         self.conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
         self.conn.commit()
@@ -292,6 +306,44 @@ class MemoryDB:
                 ORDER BY v.times_wrong DESC, v.last_seen DESC LIMIT ?""",
             (user_id, subject, limit),
         ).fetchall()
+
+    # --- leçons -------------------------------------------------------------------
+    def start_lesson_run(self, session_id: int, user_id: int, subject: str, key: str, title: str,
+                         plan: dict, progress: dict) -> None:
+        self.conn.execute(
+            """INSERT INTO lesson_runs(session_id, user_id, subject, lesson_key, title, plan, section, question,
+                                       results, done, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (session_id, user_id, subject, key, title, json.dumps(plan, ensure_ascii=False), progress["section"],
+             progress["question"], progress["results"], int(progress["done"]), _now()))
+        self.conn.commit()
+
+    def update_lesson_run(self, session_id: int, progress: dict) -> None:
+        self.conn.execute(
+            "UPDATE lesson_runs SET section = ?, question = ?, results = ?, done = ?, updated_at = ? WHERE session_id = ?",
+            (progress["section"], progress["question"], progress["results"], int(progress["done"]), _now(),
+             session_id))
+        self.conn.commit()
+
+    def lesson_run(self, session_id: int) -> sqlite3.Row | None:
+        return self.conn.execute("SELECT * FROM lesson_runs WHERE session_id = ?", (session_id,)).fetchone()
+
+    def last_lesson_run(self, user_id: int, subject: str, key: str) -> sqlite3.Row | None:
+        return self.conn.execute(
+            "SELECT * FROM lesson_runs WHERE user_id = ? AND subject = ? AND lesson_key = ? ORDER BY session_id DESC",
+            (user_id, subject, key)).fetchone()
+
+    def lesson_runs(self, user_id: int, subject: str) -> list[sqlite3.Row]:
+        """Dernière séance de chaque leçon suivie par l'élève, la plus récente d'abord, et s'il l'a déjà finie."""
+        return self.conn.execute(
+            """SELECT r.*, (SELECT MAX(done) FROM lesson_runs d WHERE d.user_id = r.user_id AND d.subject = r.subject
+                            AND d.lesson_key = r.lesson_key) AS ever_done
+               FROM lesson_runs r
+               WHERE r.user_id = ? AND r.subject = ? AND r.session_id = (
+                   SELECT MAX(session_id) FROM lesson_runs l WHERE l.user_id = r.user_id AND l.subject = r.subject
+                   AND l.lesson_key = r.lesson_key)
+               ORDER BY r.session_id DESC""",
+            (user_id, subject)).fetchall()
 
     # --- profil et métriques ----------------------------------------------------
     def get_profile(self, user_id: int, subject: str) -> dict[str, str]:

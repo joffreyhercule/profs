@@ -1,0 +1,83 @@
+# Leçon du programme de botanique. Format : voir server/lessons.py (Lesson.from_plan).
+title: "La plante et ses organes"
+summary: "Comment une plante à fleurs est organisée, et à quoi sert chacun de ses organes : racine, tige, feuille, fleur, fruit et graine."
+
+sections:
+  - title: "Qu'est-ce qu'une plante ?"
+    points:
+      - "Une plante est un être vivant autotrophe : elle fabrique elle-même sa matière organique à partir de la lumière, de l'eau et du dioxyde de carbone de l'air, grâce à la photosynthèse."
+      - "Ses cellules ont trois particularités : une paroi rigide faite de cellulose, des chloroplastes qui contiennent la chlorophylle, et une grande vacuole remplie d'eau qui garde la cellule gonflée."
+      - "Une plante ne se déplace pas : elle s'adapte sur place, en poussant vers la lumière, en perdant ses feuilles en hiver ou en se défendant par des épines ou des substances toxiques."
+      - "Les plantes à fleurs, ou angiospermes, sont de loin les plus nombreuses, avec plus de 300 000 espèces ; les conifères, les fougères et les mousses forment les autres grands groupes."
+      - "Une plante à fleurs comprend un appareil végétatif, racines, tige et feuilles, qui la nourrit, et un appareil reproducteur, les fleurs, qui donnent les fruits et les graines."
+    check: "Pourquoi dit-on qu'une plante est autotrophe ?"
+
+  - title: "La racine"
+    points:
+      - "La racine ancre la plante dans le sol et absorbe l'eau et les sels minéraux, comme les nitrates, dont elle a besoin."
+      - "L'absorption se fait surtout près de la pointe, par les poils absorbants : des milliers de fins prolongements de cellules qui multiplient la surface de contact avec le sol."
+      - "La pointe de la racine est protégée par une coiffe qui l'aide à s'enfoncer entre les grains de terre ; juste derrière, une zone de cellules qui se divisent assure la croissance en longueur."
+      - "Une racine pivotante a un gros axe principal qui s'enfonce profondément, comme chez la carotte, le pissenlit ou le chêne ; un système fasciculé forme une touffe de racines fines de même taille, comme chez le blé, le poireau ou les graminées du gazon."
+      - "Certaines racines stockent des réserves, comme la carotte ou la betterave ; la plupart vivent aussi en association avec des champignons, les mycorhizes, qui les aident à puiser l'eau et le phosphore en échange de sucres."
+    check: "Par quelle partie de la racine l'eau entre-t-elle surtout ?"
+
+  - title: "La tige"
+    points:
+      - "La tige porte les feuilles et les fleurs vers la lumière, et relie les racines aux feuilles : ses vaisseaux conduisent la sève."
+      - "Elle est formée de nœuds, où s'attachent les feuilles, séparés par des entre-nœuds ; à l'aisselle de chaque feuille se trouve un bourgeon capable de donner une nouvelle pousse."
+      - "Le bourgeon terminal, au sommet, fait grandir la tige en hauteur ; en le taillant, le jardinier réveille les bourgeons latéraux et rend la plante plus touffue."
+      - "Une tige herbacée reste verte et souple, comme chez le coquelicot ; une tige ligneuse fabrique du bois et devient tronc ou branches, comme chez les arbres et les arbustes."
+      - "Certaines tiges changent de rôle : le tubercule de la pomme de terre est une tige gonflée de réserves, dont les yeux sont des bourgeons, ce qu'une racine n'a jamais ; le rhizome de l'iris court sous terre, et le stolon du fraisier rampe en surface pour donner de nouveaux pieds."
+    check: "Qu'est-ce qui prouve que la pomme de terre est une tige et non une racine ?"
+
+  - title: "La feuille"
+    points:
+      - "La feuille est l'usine de la plante : c'est surtout là que se fait la photosynthèse, grâce à la chlorophylle qui lui donne sa couleur verte."
+      - "Elle se compose d'un limbe, la partie plate, souvent relié à la tige par un pétiole ; le limbe est parcouru de nervures qui apportent la sève brute et emportent la sève élaborée."
+      - "Sa face inférieure porte surtout des stomates, de minuscules ouvertures qui laissent entrer le dioxyde de carbone et sortir l'oxygène et la vapeur d'eau."
+      - "Une feuille simple a un seul limbe, comme celle du chêne ; une feuille composée est divisée en folioles attachées sur un axe, comme celle du frêne ou du rosier."
+      - "Sur la tige, les feuilles sont alternes, une par nœud, comme chez le hêtre ; opposées, deux face à face, comme chez l'érable ; ou verticillées, trois ou plus en cercle, comme chez le laurier-rose. Il ne faut pas confondre cette disposition avec la forme simple ou composée de la feuille."
+      - "Des nervures parallèles, comme chez le blé ou la tulipe, signalent une monocotylédone ; des nervures ramifiées en réseau, comme chez le chêne, une dicotylédone."
+    check: "Quelle est la différence entre une feuille composée et des feuilles opposées ?"
+
+  - title: "La fleur"
+    points:
+      - "La fleur est l'organe de la reproduction des plantes à fleurs ; ses pièces sont disposées en cercles, de l'extérieur vers le centre."
+      - "Les sépales, souvent verts, forment le calice et protègent le bouton ; les pétales, souvent colorés, forment la corolle et attirent les insectes pollinisateurs."
+      - "Les étamines sont les organes mâles : chacune porte, au bout d'un filet, une anthère qui produit le pollen."
+      - "Le pistil est l'organe femelle, au centre : le stigmate, collant, reçoit le pollen ; le style le relie à l'ovaire, qui contient les ovules."
+      - "La plupart des fleurs ont étamines et pistil : elles sont hermaphrodites. Chez certaines espèces, fleurs mâles et femelles sont séparées : sur le même pied, comme chez le noisetier ou le maïs, la plante est monoïque ; sur des pieds différents, comme chez le houx ou le kiwi, elle est dioïque."
+      - "La pollinisation est le transport du pollen des étamines jusqu'au stigmate, par le vent, comme chez les graminées, ou par les animaux, surtout les insectes."
+    check: "Dans quelle partie du pistil se trouvent les ovules ?"
+
+  - title: "Du fruit à la graine"
+    points:
+      - "Après la pollinisation, le grain de pollen germe sur le stigmate et un tube pollinique descend jusqu'à l'ovule : c'est la fécondation."
+      - "L'ovaire fécondé devient le fruit, et chaque ovule devient une graine : pour le botaniste, la tomate, le haricot vert ou la noisette sont donc des fruits."
+      - "Une graine contient un embryon, une plantule en miniature, des réserves pour ses premiers jours, et une enveloppe protectrice, le tégument."
+      - "Les fruits charnus, comme la cerise, sont mangés par des animaux qui dispersent les graines plus loin ; les fruits secs, comme la gousse du pois ou le gland, se dessèchent à maturité."
+      - "Les graines voyagent aussi avec le vent, grâce aux aigrettes du pissenlit ou aux ailes des fruits de l'érable, ou en s'accrochant au pelage des animaux, comme les petits fruits crochus du gaillet gratteron ou de la bardane."
+      - "Quand elle trouve de l'eau, de l'oxygène et une température favorable, la graine germe : la radicule sort la première, puis la tige et les premières feuilles."
+    check: "Que devient l'ovaire de la fleur après la fécondation ?"
+
+quiz:
+  - question: "Pourquoi dit-on qu'une plante est autotrophe ?"
+    answer: "Elle fabrique elle-même sa matière organique par la photosynthèse, à partir de lumière, d'eau et de dioxyde de carbone."
+  - question: "Comment s'appellent les fins prolongements de la racine qui absorbent l'eau ?"
+    answer: "Les poils absorbants."
+  - question: "Cite une plante à racine pivotante et une plante à racines fasciculées."
+    answer: "Pivotante : carotte, pissenlit, chêne… Fasciculées : blé, poireau, graminées du gazon…"
+  - question: "Pourquoi la pomme de terre est-elle une tige et non une racine ?"
+    answer: "Ses yeux sont des bourgeons, et seule une tige porte des bourgeons."
+  - question: "Que trouve-t-on à l'aisselle d'une feuille ?"
+    answer: "Un bourgeon."
+  - question: "Par quelles ouvertures la feuille échange-t-elle des gaz avec l'air ?"
+    answer: "Les stomates."
+  - question: "Le frêne a-t-il des feuilles simples ou composées ?"
+    answer: "Composées, divisées en folioles."
+  - question: "Quel est l'organe mâle de la fleur, et que produit-il ?"
+    answer: "L'étamine, dont l'anthère produit le pollen."
+  - question: "Que devient l'ovule après la fécondation ?"
+    answer: "Une graine."
+  - question: "Donne deux façons dont les graines sont dispersées."
+    answer: "Par le vent, par les animaux (fruits mangés ou accrochés au pelage), ou par l'eau."

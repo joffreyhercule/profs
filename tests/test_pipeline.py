@@ -55,12 +55,14 @@ class FakeLLM:
         self.prompts = []
         self.format = ChatFormat(FAKE_TEMPLATE)
         self.used = 1000  # contexte occupé annoncé en fin de génération, comme llama-server
+        self.reply = REPLY
+        self.completion = '{"summary": "Bonne séance.", "level": "B1", "notes": "Practise past simple."}'
 
     async def stream_prompt(self, prompt, max_tokens=None, usage=None, stop=None):
         self.prompts.append(prompt)
         # Comme Gemma en fin de longue séance, le faux modèle ne s'arrête pas de lui-même après </fix> ;
         # llama-server coupe au mot d'arrêt, que le client renvoie en dernier.
-        out = REPLY + "\n<fix>[]</fix>" * 3
+        out = self.reply + "\n<fix>[]</fix>" * 3
         if stop:
             cut = min((out.find(w) for w in stop if w in out), default=-1)
             if cut >= 0:
@@ -74,7 +76,8 @@ class FakeLLM:
             usage["tokens"] = self.used
 
     async def complete(self, messages, max_tokens=None):
-        return '{"summary": "Bonne séance.", "level": "B1", "notes": "Practise past simple."}'
+        self.prompts.append(messages[-1]["content"])
+        return self.completion
 
     async def prime_prompt(self, prompt):
         return 800  # taille du préfixe mis en cache, comme tokens_evaluated
@@ -259,3 +262,117 @@ async def test_history_is_halved_when_next_turn_would_not_fit_in_llm_context(set
     gauge =[(e["used"], e["trims"]) for e in ws.events("context")]
     assert gauge == [(1000, 0), (1000, 0), (ctx - 500, 1), (800, 1)]
     assert all(e["max"] == ctx for e in ws.events("context"))
+
+
+def lesson_reply(marker: str) -> str:
+    return ('<say lang="fr">Très bien ! La sève brute monte des racines vers les feuilles. Tu me suis ?</say>'
+            f'<lesson>{marker}</lesson><fix>[]</fix>')
+
+
+async def botany_session(eng, name="Tom"):
+    ws = FakeWS()
+    session = Session(eng, ws, eng.db.create_user(name) if isinstance(name, str) else name, "botanique")
+    return session, ws, asyncio.create_task(session._writer())
+
+
+async def learner_turn(session):
+    await session.on_control({"type": "ptt", "state": "down"})
+    await feed(session, speech(500))
+    await session.on_control({"type": "ptt", "state": "up"})
+    await settle()
+    await session.on_control({"type": "played", "turn": session.live.id if session.live else 0})
+
+
+async def test_program_lesson_is_taught_tracked_and_resumed(setup):
+    _, _, eng = setup
+    session, ws, writer = await botany_session(eng)
+    await session.on_control({"type": "lesson", "choice": "lesson", "key": "programme:03-seves"})
+    await settle(0.05)
+    plan = ws.events("lesson_plan")[-1]
+    assert plan["lesson"]["title"] == "La circulation de la sève" and plan["resume"] is None
+    assert "# Plan de la leçon : La circulation de la sève" in session.system
+
+    eng.llm.reply = lesson_reply('{"section": 1}')
+    await session.on_control({"type": "start"})
+    await settle()
+    assert "commence la leçon « La circulation de la sève »" in eng.llm.prompts[-1]
+    await session.on_control({"type": "played", "turn": session.live.id})
+
+    eng.llm.reply = lesson_reply('{"section": 2}')
+    await learner_turn(session)
+    # le LLM lit le message de l'élève précédé du repère d'avancement ; la base et la page, sans
+    assert "[Leçon : partie 1/6 · 0 min] yesterday I goed to school" in eng.llm.prompts[-1]
+    assert ws.events("user_final")[-1]["text"] == "yesterday I goed to school"
+    progress = ws.events("lesson_progress")[-1]
+    assert (progress["section"], progress["sections"], progress["questions"]) == (2, 6, 10)
+    assert eng.db.lesson_run(session.session_id)["section"] == 2
+
+    await session.on_control({"type": "end_session"})
+    await settle(0.05)
+    assert ws.events("session_ended")[-1]["lesson"]["section"] == 2
+    assert "(Lesson: « La circulation de la sève » (stopped at part 2))" in eng.llm.prompts[-1]
+    writer.cancel()
+
+    # séance suivante : la leçon reprend à la partie 2
+    again, ws2, writer2 = await botany_session(eng, session.user_id)
+    await again.on_control({"type": "lesson", "choice": "lesson", "key": "programme:03-seves"})
+    await settle(0.05)
+    assert ws2.events("lesson_plan")[-1]["resume"] == "la partie 2 (L'eau entre par les racines)"
+    await again.on_control({"type": "start"})
+    await settle()
+    assert "reprend la leçon « La circulation de la sève »" in eng.llm.prompts[-1]
+    assert "« La circulation de la sève » (stopped at part 2)" in again.system  # mémoire du prof
+    writer2.cancel()
+
+
+async def test_lesson_on_a_chosen_theme_is_written_by_the_llm(setup):
+    _, _, eng = setup
+    session, ws, writer = await botany_session(eng)
+    eng.llm.completion = json.dumps({
+        "title": "Les plantes carnivores", "summary": "Comment elles piègent leurs proies.",
+        "sections": [{"title": f"Partie {i}", "points": ["Une notion."], "check": "Compris ?"} for i in range(6)],
+        "quiz": [{"question": f"Question {i} ?", "answer": "Oui."} for i in range(10)]})
+    await session.on_control({"type": "lesson", "choice": "generate", "theme": "  les plantes   carnivores "})
+    await settle(0.05)
+    assert ws.events("lesson_generating")[0]["theme"] == "les plantes carnivores"
+    assert "sur ce thème : les plantes carnivores" in eng.llm.prompts[-1]
+    lesson = ws.events("lesson_plan")[-1]["lesson"]
+    assert lesson["title"] == "Les plantes carnivores" and lesson["generated"] and lesson["key"].startswith("gen:")
+
+    eng.llm.completion = "désolé, pas de JSON"
+    await session.on_control({"type": "lesson", "choice": "generate", "theme": "les lichens"})
+    await settle(0.05)
+    assert "n'a pas réussi à préparer" in ws.events("lesson_error")[-1]["message"]
+    assert session.lesson.lesson.title == "Les plantes carnivores"  # le choix précédent reste valable
+
+    await session.on_control({"type": "lesson", "choice": "free"})
+    await settle(0.05)
+    assert session.lesson is None and ws.events("lesson_plan")[-1]["lesson"] is None
+    writer.cancel()
+
+
+async def test_quiz_hint_for_sound_alike_answer_and_exact_final_score(setup):
+    from server.lessons import LessonState
+
+    _, _, eng = setup
+    session, ws, writer = await botany_session(eng)
+    await session.on_control({"type": "lesson", "choice": "lesson", "key": "programme:01-organes"})
+    eng.llm.reply = lesson_reply('{"section": 1}')
+    await session.on_control({"type": "start"})
+    await settle()
+    await session.on_control({"type": "played", "turn": session.live.id})
+
+    # quiz en cours : question 2 posée, la transcription écrit « poêles » pour « poils »
+    session.lesson = LessonState(session.lesson.lesson, section=6, reached=6, question=2, results={1: True})
+    eng.stt.transcribe = lambda audio: "Des poêles absorbants."
+    eng.llm.reply = lesson_reply('{"answered": 2, "right": true, "question": 3}')
+    await learner_turn(session)
+    assert "« poêles » se prononce comme « poils »]" in eng.llm.prompts[-1]
+
+    # dernière réponse : le score exact est dit par le serveur, après la réponse du LLM
+    session.lesson.question, session.lesson.results = 10, {q: q != 5 for q in range(1, 10)}
+    eng.llm.reply = lesson_reply('{"answered": 10, "right": true, "done": true}')
+    await learner_turn(session)
+    assert ws.events("segment")[-1]["text"] == "Ton score au quiz : 9 sur 10."
+    assert ws.events("lesson_progress")[-1]["score"] == 9 and session.lesson.done
+    writer.cancel()

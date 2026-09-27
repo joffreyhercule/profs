@@ -45,11 +45,24 @@ Le script vérifie qu'il reste ~23 Go de VRAM libres (décharge ComfyUI ou tout 
 - **Échap** coupe le prof.
 - **Terminer la séance** : le prof rédige un bilan qui alimente la séance suivante.
 
+### Les leçons de botanique
+
+Avec Basile, choisis ton cours avant de commencer :
+
+- **la leçon suivante du programme**, déjà sélectionnée ; les leçons terminées affichent ton score au quiz ;
+- **une leçon déjà vue**, pour la revoir ;
+- **une leçon à la carte**, sur le thème de ton choix : Basile l'écrit en une trentaine de secondes, et tu vois son plan avant de commencer ;
+- **la discussion libre**, sans programme.
+
+Une leçon dure une trentaine de minutes. Basile explique les parties du plan une à une et répond à tes questions, puis te fait passer un quiz de 10 questions. En haut de la marge, tu vois les parties déjà vues, celle en cours et tes réponses au quiz. Une leçon interrompue reprend là où tu t'étais arrêté ; un quiz raté n'empêche pas de passer à la suite, et les notions manquées vont dans « À retravailler ».
+
 La mémoire est dans `data\profs.db` (SQLite). Pour repartir de zéro, supprime ce fichier serveur arrêté : il est recréé vide au lancement.
 
 ## Ajouter une matière
 
 Copie `subjects\botanique.yaml` sous un nouveau nom et adapte-le : identifiant, nom du prof, description et langue de sa voix, types d'erreurs suivis, consignes pédagogiques (`prompt`), salutation, bilan de fin de séance. Garde le format de sortie `<say>` / `<fix>` décrit dans le prompt. Puis crée sa voix avec `design_voice.py <identifiant>` et relance le serveur.
+
+Pour qu'elle donne des leçons, ajoute-lui un bloc `lesson` (consignes de la leçon, salutation, reprise, génération à la carte : voir `botanique.yaml`) et écris son programme dans `subjects\<identifiant>\lessons\`, une leçon par fichier numéroté (`01-…yaml`) : titre, résumé, parties avec leurs notions et une question de compréhension, puis le quiz avec les réponses attendues. Le prof s'en tient au plan : c'est ce qui garantit l'exactitude de ce qu'il enseigne.
 
 ## Bancs d'essai
 

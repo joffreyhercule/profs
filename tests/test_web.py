@@ -25,3 +25,31 @@ def test_version_changes_when_a_page_file_changes(tmp_path, monkeypatch):
     before = main.web_version()
     (web / "player-worklet.js").write_text("// modifié", encoding="utf-8")
     assert main.web_version() != before
+
+
+def test_lessons_api_gives_progress_through_the_program(monkeypatch):
+    from types import SimpleNamespace
+
+    from server.lessons import Lesson, LessonState
+    from server.memory.db import MemoryDB
+    from server.subjects import load_subjects
+
+    subjects, db = load_subjects(), MemoryDB(":memory:")
+    monkeypatch.setitem(main.state, "engines", SimpleNamespace(db=db, subjects=subjects))
+    uid = db.create_user("Léa")
+    organes, photo, _ = subjects["botanique"].lessons
+    done = LessonState(organes, question=10, results={i: i <= 8 for i in range(1, 11)}, done=True)
+    started = LessonState(photo, section=3, reached=3)
+    generated = LessonState(Lesson.from_plan("gen:1", {**organes.plan(), "title": "Les lichens"}), done=True,
+                            question=10, results={1: True})
+    for state in (done, started, generated):
+        sid = db.start_session(uid, "botanique")
+        db.start_lesson_run(sid, uid, "botanique", state.lesson.key, state.lesson.title, state.lesson.plan(),
+                            state.row())
+
+    body = TestClient(main.app).get(f"/api/lessons?user={uid}&subject=botanique").json()
+    assert [(p["number"], p["status"]) for p in body["program"]] == [(1, "done"), (2, "started"), (3, "todo")]
+    assert body["program"][0]["score"] == "8/10" and body["program"][1]["resume"] == "partie 3"
+    assert body["next"] == "programme:02-photosynthese"
+    assert [g["title"] for g in body["generated"]] == ["Les lichens"]
+    assert TestClient(main.app).get(f"/api/lessons?user={uid}&subject=anglais").json() == {"enabled": False}

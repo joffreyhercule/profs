@@ -1,0 +1,80 @@
+# Leçon du programme de botanique. Format : voir server/lessons.py (Lesson.from_plan).
+title: "La photosynthèse et la respiration"
+summary: "Comment une plante fabrique sa matière avec de la lumière, de l'eau et de l'air, et pourquoi elle respire aussi, jour et nuit."
+
+sections:
+  - title: "Fabriquer sa matière avec de la lumière"
+    points:
+      - "La photosynthèse est la réaction par laquelle la plante fabrique des sucres à partir du dioxyde de carbone de l'air et de l'eau, avec l'énergie de la lumière ; elle rejette de l'oxygène."
+      - "En résumé : dioxyde de carbone, plus eau, plus lumière, donnent du glucose et de l'oxygène. En chiffres, six molécules de dioxyde de carbone et six d'eau donnent une molécule de glucose et six d'oxygène."
+      - "L'essentiel de la masse sèche d'un arbre vient donc de l'air, et non du sol : le carbone du bois a été capté dans le dioxyde de carbone de l'atmosphère."
+      - "Au XVIIe siècle, Van Helmont fait pousser un saule dans un pot pendant cinq ans : l'arbre gagne environ 74 kilos, alors que la terre ne perd que quelques dizaines de grammes. Il en conclut que la matière vient de l'eau ; on sait aujourd'hui qu'elle vient surtout du dioxyde de carbone de l'air."
+      - "Presque toute la vie sur Terre dépend de la photosynthèse : elle produit l'oxygène que nous respirons et la matière qui nourrit les chaînes alimentaires."
+    check: "D'où vient l'essentiel de la matière d'un arbre ?"
+
+  - title: "Où se fait la photosynthèse"
+    points:
+      - "Elle se fait dans les parties vertes, surtout les feuilles, à l'intérieur des chloroplastes, de petits organites présents par dizaines dans chaque cellule."
+      - "Les chloroplastes contiennent la chlorophylle, un pigment qui absorbe surtout la lumière rouge et la lumière bleue et renvoie le vert : c'est pour cela que les feuilles nous paraissent vertes."
+      - "Dans la feuille, les cellules les plus riches en chloroplastes sont serrées sous la face supérieure, la mieux éclairée : c'est le parenchyme palissadique."
+      - "D'autres pigments, jaunes et orangés, les caroténoïdes, sont présents aussi, mais masqués par la chlorophylle."
+      - "En automne, les arbres caducs démontent leur chlorophylle pour en récupérer l'azote : les caroténoïdes apparaissent, d'où les jaunes et les orangés ; les rouges viennent d'autres pigments, les anthocyanes, fabriqués à ce moment-là."
+    check: "Pourquoi les feuilles sont-elles vertes ?"
+
+  - title: "Les ingrédients : lumière, eau, dioxyde de carbone"
+    points:
+      - "La lumière fournit l'énergie : sans elle, pas de photosynthèse. Une plante gardée dans le noir jaunit, s'allonge et s'affaiblit : on dit qu'elle s'étiole."
+      - "L'eau vient du sol : absorbée par les racines, elle monte jusqu'aux feuilles dans la sève brute, par les vaisseaux du xylème."
+      - "Le dioxyde de carbone entre dans la feuille par les stomates, surtout présents sur la face inférieure."
+      - "Quand les stomates sont ouverts, la feuille perd aussi de la vapeur d'eau : c'est la transpiration. La plante fait donc un compromis permanent entre capter du dioxyde de carbone et économiser son eau."
+      - "En cas de sécheresse, la plante ferme ses stomates pour limiter ses pertes d'eau : sa photosynthèse ralentit, et elle pousse moins."
+    check: "Pourquoi une plante qui manque d'eau fait-elle moins de photosynthèse ?"
+
+  - title: "Ce que devient le sucre"
+    points:
+      - "Le glucose fabriqué dans la feuille est transformé en saccharose, le sucre de table, qui voyage dans la sève élaborée, par les vaisseaux du phloème."
+      - "La sève élaborée apporte ce sucre à toutes les parties qui en ont besoin : racines, bourgeons, fleurs, fruits en croissance."
+      - "Une partie est mise en réserve sous forme d'amidon, un assemblage de nombreux glucoses, dans la pomme de terre, les grains de blé ou les racines et le tronc des arbres."
+      - "Une autre partie sert à construire la plante : la cellulose des parois des cellules, principal composant du bois et du papier, est elle aussi faite de glucose."
+      - "Enfin, une partie est consommée par la respiration, pour fournir l'énergie dont les cellules ont besoin pour vivre."
+    check: "Sous quelle forme la pomme de terre stocke-t-elle ses réserves ?"
+
+  - title: "La respiration, jour et nuit"
+    points:
+      - "Comme nous, la plante respire : toutes ses cellules, dans les racines, la tige, les feuilles ou les fleurs, consomment de l'oxygène et rejettent du dioxyde de carbone."
+      - "La respiration libère l'énergie contenue dans les sucres ; elle a lieu jour et nuit, sans arrêt, alors que la photosynthèse ne se fait qu'à la lumière."
+      - "Le jour, la photosynthèse est bien plus intense que la respiration : au bilan, la plante absorbe du dioxyde de carbone et rejette de l'oxygène."
+      - "La nuit, il ne reste que la respiration : la plante rejette alors un peu de dioxyde de carbone, en quantité très faible ; une plante dans une chambre ne présente aucun danger."
+      - "Il ne faut donc pas confondre les deux : la photosynthèse fabrique les sucres et libère l'oxygène ; la respiration consomme les sucres et l'oxygène."
+    check: "Une plante respire-t-elle aussi pendant la journée ?"
+
+  - title: "Les limites et les adaptations"
+    points:
+      - "La photosynthèse est freinée par ce qui manque le plus : la lumière, le dioxyde de carbone, l'eau ou une température favorable ; chez la plupart des plantes de nos régions, elle diminue nettement au-delà de 30 à 35 degrés."
+      - "Les plantes d'ombre, comme le lierre ou les fougères de sous-bois, ont des feuilles larges et fines qui utilisent bien une lumière faible ; les plantes de soleil ont des feuilles plus petites et plus épaisses."
+      - "Certaines plantes des pays chauds, comme le maïs ou la canne à sucre, ont un mécanisme dit C4 qui capte le dioxyde de carbone plus efficacement quand il fait chaud et sec."
+      - "Les plantes grasses, comme les cactus ou la joubarbe de nos montagnes, ouvrent leurs stomates la nuit, quand il fait frais, pour stocker le dioxyde de carbone et perdre moins d'eau : c'est le métabolisme CAM."
+      - "Les maraîchers en tirent parti : dans les serres, on enrichit parfois l'air en dioxyde de carbone pour accélérer la croissance."
+    check: "Pourquoi les cactus ouvrent-ils leurs stomates la nuit ?"
+
+quiz:
+  - question: "Avec quoi la plante fabrique-t-elle ses sucres pendant la photosynthèse, et grâce à quelle énergie ?"
+    answer: "Avec le dioxyde de carbone de l'air et l'eau, grâce à l'énergie de la lumière."
+  - question: "Quel gaz la plante rejette-t-elle pendant la photosynthèse ?"
+    answer: "L'oxygène."
+  - question: "D'où vient l'essentiel de la masse sèche d'un arbre ?"
+    answer: "Du dioxyde de carbone de l'air, pas du sol."
+  - question: "Dans quels organites de la cellule se fait la photosynthèse ?"
+    answer: "Les chloroplastes."
+  - question: "Quelles couleurs de lumière la chlorophylle absorbe-t-elle surtout ?"
+    answer: "Le rouge et le bleu ; elle renvoie le vert."
+  - question: "Par où le dioxyde de carbone entre-t-il dans la feuille ?"
+    answer: "Par les stomates."
+  - question: "Pourquoi beaucoup de feuilles jaunissent-elles en automne ?"
+    answer: "La chlorophylle est démontée, ce qui révèle les caroténoïdes jaunes et orangés."
+  - question: "Sous quelle forme le sucre voyage-t-il dans la sève élaborée ?"
+    answer: "Sous forme de saccharose."
+  - question: "La respiration a-t-elle lieu le jour, la nuit, ou les deux ?"
+    answer: "Les deux : jour et nuit."
+  - question: "Pourquoi un cactus ouvre-t-il ses stomates la nuit ?"
+    answer: "Pour capter le dioxyde de carbone au frais en perdant moins d'eau (métabolisme CAM)."

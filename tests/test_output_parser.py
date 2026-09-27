@@ -108,3 +108,18 @@ def test_transcription_fixes_are_dropped_whatever_the_subject():
         '"corrected": "des feuilles alternes"}]</fix>',
         default_lang="fr", fix_types=("misconception", "terminology", "imprecision"))
     assert [f["type"] for f in reply.fixes] == ["misconception"] and not reply.fix_parse_error
+
+
+def test_lesson_marker_and_fixes_survive_any_token_boundary():
+    """La balise fermante arrive souvent coupée (« </les », « son> ») : ni la balise ni les corrections ne
+    doivent s'y perdre, même quand les corrections contiennent des accolades."""
+    text = ('<say lang="fr">Pas tout à fait : la sève brute monte.</say>\n<lesson>{"section": 3}</lesson>\n'
+            '<fix>[{"type": "misconception", "original": "elle descend", "corrected": "elle monte", '
+            '"rule_key": "sens_seve"}]</fix>')
+    for size in range(1, 12):
+        parser = ReplyParser("fr", ("misconception",))
+        for i in range(0, len(text), size):
+            parser.feed(text[i:i + size])
+        parser.close()
+        assert parser.reply.lesson == {"section": 3}, size
+        assert [f["corrected"] for f in parser.reply.fixes] == ["elle monte"], size

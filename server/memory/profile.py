@@ -15,7 +15,8 @@ def memory_block(db: MemoryDB, user_id: int, subject: str, top_errors: int = 8, 
     errors = db.top_errors(user_id, subject, top_errors, mastered_after)
     mastered = db.mastered_errors(user_id, subject, mastered_after)
     vocab = db.vocabulary_to_review(user_id, subject, 8, mastered_after)
-    if not (profile or recent or errors or mastered):
+    lessons = db.lesson_runs(user_id, subject)[:4]
+    if not (profile or recent or errors or mastered or lessons):
         return ""
 
     lines = ["Memory of your previous sessions with this learner:"]
@@ -26,6 +27,8 @@ def memory_block(db: MemoryDB, user_id: int, subject: str, top_errors: int = 8, 
     if recent:
         lines.append("- Recent sessions (most recent first), summaries in French:")
         lines += [f"  - {s['started_at'][:10]}: {s['summary']}" for s in recent]
+    if lessons:
+        lines.append("- Lessons followed (most recent first): " + "; ".join(lesson_status(r) for r in lessons))
     if errors:
         lines.append("- Recurring mistakes or misconceptions (most frequent first). "
                      "Bring them up naturally and check they are fixed:")
@@ -43,6 +46,19 @@ def memory_block(db: MemoryDB, user_id: int, subject: str, top_errors: int = 8, 
     return "\n".join(lines)
 
 
+def lesson_status(run) -> str:
+    """« Titre » et où l'élève en est, d'après une ligne de lesson_runs."""
+    results = json.loads(run["results"] or "{}")
+    n_questions = len(json.loads(run["plan"]).get("quiz", []))
+    if run["done"]:
+        state = f"finished, quiz {sum(results.values())}/{n_questions}"
+    elif run["question"]:
+        state = f"stopped at quiz question {run['question']}"
+    else:
+        state = f"stopped at part {run['section']}"
+    return f"« {run['title']} » ({state})"
+
+
 def summary_prompt(db: MemoryDB, subject: Subject, user_id: int, session_id: int) -> str | None:
     turns = db.session_turns(session_id)
     if not any(t["role"] == "user" for t in turns):
@@ -50,6 +66,9 @@ def summary_prompt(db: MemoryDB, subject: Subject, user_id: int, session_id: int
     transcript = "\n".join(
         f"{'Learner' if t['role'] == 'user' else 'Teacher'}: {t['text']}" for t in turns
     )
+    run = db.lesson_run(session_id)
+    if run is not None:
+        transcript = f"(Lesson: {lesson_status(run)})\n" + transcript
     mistakes = "\n".join(
         f'- {e["rule_key"]}: "{e["original"]}" -> "{e["corrected"]}"' for e in db.session_errors(session_id)
     ) or "(none)"
