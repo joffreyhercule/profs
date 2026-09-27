@@ -1,0 +1,60 @@
+# Configuration du professeur. Tous les modèles restent résidents en VRAM.
+
+server:
+  host: 127.0.0.1
+  port: 8765
+
+# Les profs (nom, voix, langue, consignes) sont décrits dans subjects/*.yaml
+
+llm:
+  server_bin: tools/llama.cpp/llama-server.exe
+  host: 127.0.0.1
+  port: 8766
+  model: { repo: google/gemma-4-26B-A4B-it-qat-q4_0-gguf, file: gemma-4-26B_q4_0-it.gguf }
+  draft: { repo: unsloth/gemma-4-26B-A4B-it-qat-GGUF, file: mtp-gemma-4-26B-A4B-it.gguf }
+  ctx: 8192
+  # KV cache laissé en F16 : Gemma 4 26B-A4B se dégrade nettement en q8/q4.
+  args: [-ngl, "99", -np, "1", --swa-full, -fa, "on", --reasoning, "off", --jinja,
+         --spec-type, draft-mtp, --spec-draft-n-max, "2", -ngld, "99"]
+  temperature: 0.6
+  max_tokens: 400
+  # Après le premier segment, le LLM s'interrompt jusqu'au premier morceau audio (au plus
+  # pause_max_ms) : la voix a le GPU pour elle seule, puis la génération reprend là où elle était.
+  pause_after_first_segment: true
+  pause_max_ms: 250
+
+stt:
+  repo: istupakov/parakeet-tdt-0.6b-v3-onnx
+  model_name: nemo-parakeet-tdt-0.6b-v3
+  quantization: null          # null = fp32 GPU (le plus rapide) ; "int8" = CPU, inutilisable
+  # Option VRAM : encodeur fp16 (scripts/convert_stt_fp16.py) = -1,4 Go mais 2x plus lent sur ce GPU
+  # path: data/models/parakeet-tdt-0.6b-v3-fp16
+  # quantization: fp16
+  partial_interval_ms: 300
+
+vad:
+  threshold: 0.5
+  threshold_while_speaking: 0.8   # relevé pendant que le prof parle (écho)
+  start_frames: 2                 # 64 ms de parole pour ouvrir un énoncé
+  eager_stt_frames: 2             # transcription lancée dès 64 ms de silence (jetée si l'élève reprend)
+  barge_in_frames: 6              # 192 ms de parole pour couper le prof
+  min_silence_ms: 160             # silence qui lance le tour spéculatif (retenu, annulable) + smart-turn
+  recheck_ms: 150                 # nouvel avis smart-turn tant que le silence dure (~18 ms CPU)
+  min_release_ms: 300             # silence minimal avant que le prof parle (sans coût : son 1er son n'est pas prêt avant)
+  max_silence_ms: 1500            # fin de tour forcée (élève qui hésite)
+
+turn:
+  repo: pipecat-ai/smart-turn-v3
+  file: smart-turn-v3.2-cpu.onnx
+  threshold: 0.5
+
+tts:
+  repo: Qwen/Qwen3-TTS-12Hz-0.6B-Base
+  sample_rate: 24000
+  chunk_size: 2                   # trames codec (12 Hz) par morceau : 2 = ~170 ms d'audio, premier son ~100 ms
+  temperature: 0.8
+
+memory:
+  db: data/profs.db
+  top_errors: 8
+  history_token_budget: 5000

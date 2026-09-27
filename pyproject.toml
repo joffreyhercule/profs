@@ -1,0 +1,47 @@
+[project]
+name = "profs"
+version = "0.1.0"
+description = "Professeur d'anglais vocal local, basse latence (STT -> LLM -> TTS en streaming)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "torch==2.14.0",
+    "torchaudio",
+    "numpy",
+    "onnxruntime-gpu[cuda,cudnn]>=1.30",
+    "onnx-asr[gpu,hub]>=0.12",
+    "faster-qwen3-tts>=0.5.2",
+    # qwen-tts-hf lit config.rope_theta, retiré de MimiConfig après 5.15
+    "transformers==5.15.1",
+    "silero-vad>=6.2",
+    "fastapi",
+    "uvicorn[standard]",
+    "httpx",
+    "huggingface-hub>=1.5",
+    "pyyaml",
+    "soundfile",
+    "nvidia-ml-py",
+    "sounddevice",
+    "soxr",
+    "websockets",
+]
+
+[dependency-groups]
+dev = ["pytest", "pytest-asyncio", "onnx"]
+
+[tool.uv]
+package = false
+# qwen-tts-hf tire onnxruntime (CPU), qui écrase onnxruntime-gpu : on l'exclut.
+override-dependencies = ["onnxruntime; sys_platform == 'never'"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu130" }
+torchaudio = { index = "pytorch-cu130" }
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

@@ -1,0 +1,51 @@
+# Phrases de test pour les bancs STT (fidélité verbatim) et LLM (détection des fautes).
+# error : les mots fautifs qui DOIVENT survivre à la transcription ; expected : la correction attendue.
+
+wrong:
+  - {id: w01, text: "Yesterday I goed to the cinema with my friends.", error: "goed", expected: "went"}
+  - {id: w02, text: "She don't like coffee but she drink tea every morning.", error: "she don't", expected: "doesn't"}
+  - {id: w03, text: "I live in Lyon since two years.", error: "since two years", expected: "for two years"}
+  - {id: w04, text: "I am agree with you about this movie.", error: "am agree", expected: "I agree"}
+  - {id: w05, text: "He have three children and a big dog.", error: "he have", expected: "has"}
+  - {id: w06, text: "Actually I work in a bank, but I want to change.", error: "actually", expected: "currently"}
+  - {id: w07, text: "I have seen him yesterday at the station.", error: "have seen", expected: "saw"}
+  - {id: w08, text: "It depends of the weather.", error: "depends of", expected: "depends on"}
+  - {id: w09, text: "I am looking forward to see you next week.", error: "to see", expected: "to seeing"}
+  - {id: w10, text: "My sister is more tall than me.", error: "more tall", expected: "taller"}
+  - {id: w11, text: "We discussed about the project during the meeting.", error: "discussed about", expected: "discussed the project"}
+  - {id: w12, text: "Can you explain me how it works?", error: "explain me", expected: "explain to me"}
+  - {id: w13, text: "I have a lot of works this week.", error: "works", expected: "work"}
+  - {id: w14, text: "The informations you gave me were very useful.", error: "informations", expected: "information"}
+  - {id: w15, text: "When I will arrive, I will call you.", error: "when I will arrive", expected: "when I arrive"}
+  - {id: w16, text: "I didn't went to school last Monday.", error: "didn't went", expected: "didn't go"}
+  - {id: w17, text: "She is married with a doctor.", error: "married with", expected: "married to"}
+  - {id: w18, text: "I made a mistake and I must to fix it.", error: "must to", expected: "must fix"}
+  - {id: w19, text: "Is it possible to make a reservation for tomorrow evening? I would like eat fish.", error: "would like eat", expected: "would like to eat"}
+  - {id: w20, text: "I am here since this morning.", error: "am here since", expected: "have been here"}
+  - {id: w21, text: "The childrens are playing in the garden.", error: "childrens", expected: "children"}
+  - {id: w22, text: "He said me that he was tired.", error: "said me", expected: "told me"}
+  - {id: w23, text: "I go to the work by bike every day.", error: "the work", expected: "to work"}
+  - {id: w24, text: "If I would have known, I would have come.", error: "would have known", expected: "had known"}
+  - {id: w25, text: "I'm very interesting by this job.", error: "interesting by", expected: "interested in"}
+  - {id: w26, text: "Last summer we have visited Italy.", error: "have visited", expected: "visited"}
+  - {id: w27, text: "There is many people in the street today.", error: "there is many", expected: "there are"}
+  - {id: w28, text: "I want that you come with me.", error: "want that you come", expected: "want you to come"}
+  - {id: w29, text: "Hier j'ai goed au cinéma, how do you say that correctly?", error: "goed", expected: "went"}
+  - {id: w30, text: "I'm agree, c'est vrai que the weather is bad today.", error: "I'm agree", expected: "I agree"}
+
+correct:
+  - {id: c01, text: "I went to the cinema with my friends yesterday."}
+  - {id: c02, text: "She doesn't like coffee, but she drinks tea every morning."}
+  - {id: c03, text: "I've lived in Lyon for two years."}
+  - {id: c04, text: "I agree with you about this movie."}
+  - {id: c05, text: "Could you tell me how it works?"}
+  - {id: c06, text: "I'm really looking forward to seeing you next week."}
+  - {id: c07, text: "We talked about the project during the meeting."}
+  - {id: c08, text: "If I had known, I would have come."}
+  - {id: c09, text: "There are a lot of people in the street today."}
+  - {id: c10, text: "I'm currently working in a bank, but I'd like a change."}
+  - {id: c11, text: "My favourite colour is blue."}
+  - {id: c12, text: "I gotta go, see you later!"}
+  - {id: c13, text: "Comment on dit « j'ai hâte » en anglais ?"}
+  - {id: c14, text: "Honestly, I think the film was a bit too long."}
+  - {id: c15, text: "uh I think that um the weather is nice today"}

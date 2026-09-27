@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mes profs</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="teacher">
+      <span class="teacher-name" id="teacher-name">Tes profs</span>
+      <span class="status" id="status" aria-live="polite">Choisis ton profil et ta matière</span>
+    </div>
+    <div class="controls">
+      <div class="mode" role="radiogroup" aria-label="Façon de parler">
+        <button type="button" role="radio" aria-checked="true" data-mode="handsfree">Mains libres</button>
+        <button type="button" role="radio" aria-checked="false" data-mode="ptt">Appuyer pour parler</button>
+      </div>
+      <button type="button" class="end" id="end-session" disabled>Terminer la séance</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="sheet" aria-label="Conversation">
+      <ol class="conversation" id="conversation"></ol>
+      <div class="welcome" id="welcome">
+        <section class="pick" aria-labelledby="pick-user">
+          <h2 id="pick-user">Qui es-tu ?</h2>
+          <ul class="choices" id="profiles"></ul>
+          <form class="new-profile" id="new-profile">
+            <label for="new-name">Nouveau profil</label>
+            <input id="new-name" name="name" maxlength="40" placeholder="Ton prénom" autocomplete="off">
+            <button type="submit">Créer</button>
+          </form>
+        </section>
+        <section class="pick" aria-labelledby="pick-subject">
+          <h2 id="pick-subject">Avec qui veux-tu travailler ?</h2>
+          <ul class="choices subjects" id="subjects"></ul>
+        </section>
+        <button type="button" class="start" id="start" disabled>Commencer la séance</button>
+        <p class="hint">Un casque évite que ton prof s'entende lui-même dans ton micro.</p>
+      </div>
+    </section>
+
+    <aside class="margin-notes">
+      <section>
+        <h2>Corrections</h2>
+        <ul class="fix-list" id="fix-list"><li class="empty">Aucune faute pour l'instant.</li></ul>
+      </section>
+      <section>
+        <h2>À retravailler</h2>
+        <ul class="recurring" id="recurring"><li class="empty">Rien encore : c'est ta première séance.</li></ul>
+      </section>
+      <section class="latency">
+        <h2>Latence du dernier tour</h2>
+        <dl id="latency">
+          <div><dt>Premier son</dt><dd id="lat-audio">–</dd></div>
+          <div><dt>Transcription</dt><dd id="lat-stt">–</dd></div>
+          <div><dt>Premier mot du LLM</dt><dd id="lat-llm">–</dd></div>
+        </dl>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="mic-bar">
+    <button type="button" class="mic" id="mic" aria-label="Micro" disabled>
+      <span class="mic-level" id="mic-level"></span>
+    </button>
+    <p class="mic-hint" id="mic-hint">Maintiens Espace pour parler à tout moment. Échap coupe ton prof.</p>
+  </footer>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>

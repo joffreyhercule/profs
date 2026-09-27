@@ -1,0 +1,2 @@
+# cmd.exe lit mal les .bat en fins de ligne LF (sauts d'étiquettes ratés)
+*.bat text eol=crlf
