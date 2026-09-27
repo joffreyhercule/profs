@@ -54,13 +54,24 @@ class FakeLLM:
     def __init__(self):
         self.prompts = []
         self.format = ChatFormat(FAKE_TEMPLATE)
+        self.used = 1000  # contexte occupé annoncé en fin de génération, comme llama-server
 
-    async def stream_prompt(self, prompt, max_tokens=None):
+    async def stream_prompt(self, prompt, max_tokens=None, usage=None, stop=None):
         self.prompts.append(prompt)
-        done = next(k for k in range(len(REPLY), -1, -1) if prompt.endswith(REPLY[:k]))
-        for i in range(done, len(REPLY), 7):
+        # Comme Gemma en fin de longue séance, le faux modèle ne s'arrête pas de lui-même après </fix> ;
+        # llama-server coupe au mot d'arrêt, que le client renvoie en dernier.
+        out = REPLY + "\n<fix>[]</fix>" * 3
+        if stop:
+            cut = min((out.find(w) for w in stop if w in out), default=-1)
+            if cut >= 0:
+                word = next(w for w in stop if out.startswith(w, cut))
+                out = out[:cut + len(word)]
+        done = next(k for k in range(len(out), -1, -1) if prompt.endswith(out[:k]))
+        for i in range(done, len(out), 7):
             await asyncio.sleep(0)
-            yield REPLY[i: i + 7]
+            yield out[i: i + 7]
+        if usage is not None:
+            usage["tokens"] = self.used
 
     async def complete(self, messages, max_tokens=None):
         return '{"summary": "Bonne séance.", "level": "B1", "notes": "Practise past simple."}'
@@ -147,7 +158,8 @@ async def test_push_to_talk_turn_is_answered_and_remembered(setup):
     assert ws.events("metrics")[0]["latency_ms"]["first_audio"] >= 0
     assert eng.db.top_errors(session.user_id, "anglais")[0]["rule_key"] == "past_simple_irregular"
     assert [m["role"] for m in session.history] == ["user", "assistant"]
-    assert session.history[1]["content"] == REPLY  # le format est conservé pour les tours suivants
+    # le format est conservé pour les tours suivants, et rien de ce que le modèle écrirait après </fix>
+    assert session.history[1]["content"] == REPLY
 
 
 async def test_llm_pauses_after_first_segment_then_resumes_and_keeps_prefix(setup):
@@ -226,3 +238,19 @@ async def test_end_session_writes_summary(setup):
     await settle(0.05)
     assert ws.events("session_ended")[0]["summary"]["level"] == "B1"
     assert eng.db.get_profile(session.user_id, "anglais")["level"] == "B1"
+
+
+async def test_history_is_halved_when_next_turn_would_not_fit_in_llm_context(setup):
+    session, ws, eng = setup
+    ctx = eng.cfg["llm"]["ctx"]
+    sizes = []
+    for used in (1000, 1000, ctx - 500):  # au 3e tour, llama-server annonce un contexte presque plein
+        eng.llm.used = used
+        await session.on_control({"type": "ptt", "state": "down"})
+        await feed(session, speech(500))
+        await session.on_control({"type": "ptt", "state": "up"})
+        await settle()
+        await session.on_control({"type": "played", "turn": session.live.id if session.live else 0})
+        sizes.append(len(session.history))
+    assert sizes == [2, 4, 2]  # les deux premiers échanges sont retirés d'un coup
+    assert session.history[0]["role"] == "user" and not session.need_prime  # cache réchauffé après « played »

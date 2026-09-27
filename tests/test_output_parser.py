@@ -99,3 +99,12 @@ def test_missing_closing_bracket_is_tolerated():
 def test_unknown_fix_type_falls_back_to_grammar():
     reply = parse_full('<say>Ok.</say><fix>[{"type": "weird", "original": "a", "corrected": "b"}]</fix>')
     assert reply.fixes[0]["type"] == "grammar" and reply.fixes[0]["rule_key"] == "weird"
+
+
+def test_transcription_fixes_are_dropped_whatever_the_subject():
+    reply = parse_full(
+        '<say lang="fr">Exactement, le chêne !</say><fix>[{"type": "transcription", "original": "le chaîne", '
+        '"corrected": "le chêne"}, {"type": "misconception", "original": "des feuilles opposées", '
+        '"corrected": "des feuilles alternes"}]</fix>',
+        default_lang="fr", fix_types=("misconception", "terminology", "imprecision"))
+    assert [f["type"] for f in reply.fixes] == ["misconception"] and not reply.fix_parse_error

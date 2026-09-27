@@ -91,7 +91,7 @@ async function loadRecurring() {
     const stats = await getJson(`/api/stats?user=${state.userId}&subject=${encodeURIComponent(state.subject)}`);
     const list = $("recurring");
     if (!stats.top_errors.length) {
-      list.innerHTML = '<li class="empty">Rien encore : c’est ta première séance ici.</li>';
+      list.innerHTML = '<li class="empty">Rien à revoir pour l’instant.</li>';
       return;
     }
     list.innerHTML = "";

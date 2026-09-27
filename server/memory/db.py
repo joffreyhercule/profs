@@ -185,12 +185,13 @@ class MemoryDB:
         self.conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
         self.conn.commit()
 
-    def last_finished_session(self, user_id: int, subject: str) -> sqlite3.Row | None:
+    def recent_summaries(self, user_id: int, subject: str, limit: int = 3) -> list[sqlite3.Row]:
+        """Dernières séances résumées, la plus récente d'abord."""
         return self.conn.execute(
             """SELECT * FROM sessions WHERE user_id = ? AND subject = ? AND summary IS NOT NULL
-               ORDER BY id DESC LIMIT 1""",
-            (user_id, subject),
-        ).fetchone()
+               ORDER BY id DESC LIMIT ?""",
+            (user_id, subject, limit),
+        ).fetchall()
 
     def sessions(self, user_id: int, subject: str, limit: int = 20) -> list[sqlite3.Row]:
         return self.conn.execute(
@@ -258,17 +259,37 @@ class MemoryDB:
             "SELECT * FROM errors WHERE session_id = ? ORDER BY id", (session_id,)
         ).fetchall()
 
-    def top_errors(self, user_id: int, subject: str, limit: int = 8) -> list[sqlite3.Row]:
+    # Séances terminées depuis la dernière fois que l'élève a raté la notion (ou le terme). À partir de
+    # mastered_after, elle est considérée comme acquise ; si l'élève la rate de nouveau, elle revient.
+    _ERROR_CLEAN_SESSIONS = """(SELECT COUNT(*) FROM sessions s WHERE s.user_id = e.user_id AND s.subject = e.subject
+                                AND s.ended_at IS NOT NULL AND s.id > e.last_session_id)"""
+    _VOCAB_CLEAN_SESSIONS = """(SELECT COUNT(*) FROM sessions s WHERE s.user_id = v.user_id AND s.subject = v.subject
+                                AND s.ended_at IS NOT NULL AND s.started_at > v.last_seen)"""
+
+    def top_errors(self, user_id: int, subject: str, limit: int = 8,
+                   mastered_after: int | None = None) -> list[sqlite3.Row]:
+        """Erreurs récurrentes ; avec mastered_after, sans celles qui sont acquises."""
+        not_mastered = f"AND {self._ERROR_CLEAN_SESSIONS} < {int(mastered_after)}" if mastered_after else ""
         return self.conn.execute(
-            """SELECT * FROM error_stats WHERE user_id = ? AND subject = ?
-               ORDER BY sessions DESC, count DESC, last_seen DESC LIMIT ?""",
+            f"""SELECT e.* FROM error_stats e WHERE e.user_id = ? AND e.subject = ? {not_mastered}
+                ORDER BY e.sessions DESC, e.count DESC, e.last_seen DESC LIMIT ?""",
             (user_id, subject, limit),
         ).fetchall()
 
-    def vocabulary_to_review(self, user_id: int, subject: str, limit: int = 10) -> list[sqlite3.Row]:
+    def mastered_errors(self, user_id: int, subject: str, mastered_after: int, limit: int = 5) -> list[sqlite3.Row]:
+        """Erreurs acquises, les plus récemment ratées d'abord."""
         return self.conn.execute(
-            """SELECT * FROM vocabulary WHERE user_id = ? AND subject = ?
-               ORDER BY times_wrong DESC, last_seen DESC LIMIT ?""",
+            f"""SELECT e.* FROM error_stats e WHERE e.user_id = ? AND e.subject = ?
+                AND {self._ERROR_CLEAN_SESSIONS} >= ? ORDER BY e.last_seen DESC LIMIT ?""",
+            (user_id, subject, mastered_after, limit),
+        ).fetchall()
+
+    def vocabulary_to_review(self, user_id: int, subject: str, limit: int = 10,
+                             mastered_after: int | None = None) -> list[sqlite3.Row]:
+        not_mastered = f"AND {self._VOCAB_CLEAN_SESSIONS} < {int(mastered_after)}" if mastered_after else ""
+        return self.conn.execute(
+            f"""SELECT v.* FROM vocabulary v WHERE v.user_id = ? AND v.subject = ? {not_mastered}
+                ORDER BY v.times_wrong DESC, v.last_seen DESC LIMIT ?""",
             (user_id, subject, limit),
         ).fetchall()
 

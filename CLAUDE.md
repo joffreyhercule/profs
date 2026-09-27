@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Profs vocaux 100 % locaux (page web sur localhost) : l'élève choisit son profil et une matière (anglais avec « Claire », botanique avec « Basile »…), parle, et le prof répond à voix haute en le corrigeant, avec une mémoire persistante par élève et par matière. **La contrainte n°1 est la latence** fin de parole → premier son. Tous les modèles restent résidents en VRAM (24 Go, RTX 5090 Laptop, Windows 11 natif).
 
-Référence mesurée (voir README) : p50 ~317 ms en push-to-talk, ~362 ms en mains libres, 21,9 Go de VRAM. Tout changement touchant le chemin critique se mesure avant/après avec `scripts/bench_e2e.py`.
+Référence mesurée (voir README) : p50 ~317 ms en push-to-talk, ~362 ms en mains libres, 22,8 Go de VRAM (contexte LLM 12 288). Tout changement touchant le chemin critique se mesure avant/après avec `scripts/bench_e2e.py`.
 
 ## Commandes (PowerShell, Windows)
 
@@ -40,6 +40,7 @@ Deux processus : le serveur Python (`server/main.py`, FastAPI) et `llama-server`
 ### Matières et profils
 
 - Une matière = un fichier `subjects/<id>.yaml` (chargé par `server/subjects.py`) : nom du prof, voix (fichier + description VoiceDesign), langue par défaut, `fix_types`, consignes (`prompt`, `first_session`, `greeting`, `summary`). Il n'y a pas de prompt dans le code. Le format de sortie `<say>/<fix>` est commun à toutes les matières : c'est ce que le parseur et la mémoire exploitent.
+- Le type de correction `transcription` (mot mal écrit par le STT : « le chaîne » pour le chêne, « pivot tente ») est commun à toutes les matières et écarté par le parseur : ni affiché, ni compté. Interdire au LLM de relever ces mots ne marche pas (mesuré : 0/16, il les range en `terminology`) ; lui donner un type où les ranger, si (13/16), sans perte sur les vraies erreurs. Chaque prompt de matière doit le définir.
 - Toutes les matières partagent le même LLM et le même modèle TTS : une voix de plus n'est qu'un x-vector (`TeacherTTS.voices`, `TTSJob.voice`). Une matière dont le fichier voix manque est ignorée au démarrage.
 - La mémoire est indexée par (élève, matière) : `error_stats`, `vocabulary`, `learner_profile` ont `(user_id, subject, …)` comme clé. `MemoryDB` migre une base v0 (sans profils) via `PRAGMA user_version`, en rattachant tout à un profil « Mon profil » / anglais, et garde une copie `*.v0-backup.db`.
 
@@ -56,12 +57,13 @@ Chemin critique, orchestré par `Session` dans `server/pipeline.py` (une instanc
 ### Cache de préfixe du LLM (à ne pas casser)
 
 - `ChatFormat` (`server/llm.py`) extrait une fois, via `/apply-template` et des marqueurs, les morceaux du modèle de chat, puis `Session.prompt()` assemble le prompt en **rejouant à l'identique** le texte déjà en cache (prompt précédent + sortie brute). Passer par l'API chat casse le cache : le modèle de chat de Gemma 4 retire des tours passés le canal de réflexion qu'il ajoute à la génération.
+- Chaque génération d'un tour s'arrête sur `</fix>` (`stream_prompt(stop=…)`, qui renvoie le mot d'arrêt pour que `turn.raw` reste identique au cache). Sans ça, passé ~7 000 tokens de contexte, Gemma enchaînait des `<fix>[]</fix>` jusqu'à `max_tokens` : 3,5 s de génération contre la voix (trous audio), et l'historique brut entretenait la dérive (mesuré : 17 réponses sur 120 sans l'arrêt, 0 avec).
 - L'historique stocke la **sortie brute du LLM, balises comprises** (`turn.raw`). Avec des réponses passées en texte nu, Gemma abandonne le format `<say>/<fix>` (mesuré : 0/5).
-- Le bloc mémoire (`server/memory/profile.py`) et le prénom de l'élève sont construits une fois à la connexion puis figés dans le system prompt (`Subject.system_prompt`). `trim_history` retire d'un coup la moitié la plus ancienne et réchauffe le cache pendant un temps mort.
+- Le bloc mémoire (`server/memory/profile.py`) et le prénom de l'élève sont construits une fois à la connexion puis figés dans le system prompt (`Subject.system_prompt`). `trim_history` retire d'un coup la moitié la plus ancienne quand le tour suivant risque de dépasser `llm.ctx`, d'après le contexte occupé que compte llama-server (`tokens_evaluated + tokens_predicted`, remonté par `stream_prompt(usage=…)`), puis réchauffe le cache pendant un temps mort. Ne pas revenir à une estimation par caractères : elle sous-estimait (7 036 tokens réels pour un budget « 5 000 » dans une fenêtre de 8 192).
 
 ### Mémoire
 
-SQLite (`server/memory/db.py`, `data/profs.db`) : séances, tours, erreurs, `error_stats` par `rule_key`, vocabulaire, profil, métriques de latence. Chaque `<fix>` alimente les erreurs de façon déterministe. En fin de séance, le LLM (API chat, hors chemin critique) rédige un résumé et estime le niveau CECRL.
+SQLite (`server/memory/db.py`, `data/profs.db`) : séances, tours, erreurs, `error_stats` par `rule_key`, vocabulaire, profil, métriques de latence. Chaque `<fix>` alimente les erreurs de façon déterministe. En fin de séance, le LLM (API chat, hors chemin critique) rédige un résumé, estime le niveau et **met à jour** les notes du prof (il reçoit les précédentes via `{previous}` dans le `summary` de la matière). Le bloc mémoire donne les `recent_sessions` derniers résumés et les erreurs récurrentes non acquises : une erreur (ou un terme) absente de `mastered_after_sessions` séances terminées est « acquise », listée à part, et revient si l'élève la refait. `error_stats` et `vocabulary` se déduisent entièrement de `errors` (on peut les recalculer en rejouant `add_errors`).
 
 ### Robustesse
 
@@ -69,6 +71,7 @@ Un reset du GPU par Windows (TDR) invalide tous les contextes CUDA : `server/hea
 
 ## Invariants et pièges
 
+- STT : la réserve mémoire d'onnxruntime (arena CUDA) garde une zone par taille d'entrée, et `maybe_partial` retranscrit l'énoncé en cours toutes les 300 ms en l'allongeant : +21 Go pour un énoncé de 45 s (mesuré), la VRAM déborde en RAM système (Windows ne dit rien) et le LLM tombe à 6 tokens/s. D'où `memory.enable_memory_arena_shrinkage` après chaque appel de l'encodeur et du préprocesseur (`stt.py`, ~+3 ms). Symptôme à reconnaître : `llm_done` de 10 à 25 s dans `metrics`, « eval time » effondré dans `data/llama-server.log`. Test de non-régression : `bench_e2e.py --mode handsfree --turns 200 --long-every 20 --limit 100`.
 - `torch.set_num_threads(1)` et `session.intra_op.allow_spinning=0` sur les sessions onnxruntime : sinon les pools de fils CPU tournent à vide et affament les fils qui pilotent le GPU (+230 ms mesurés).
 - Importer torch avant de créer une session ORT CUDA : torch cu130 fournit les DLL cuBLAS que `onnxruntime-gpu[cuda]` n'installe pas.
 - `transformers==5.15.1` est épinglé (qwen-tts-hf lit `rope_theta`, retiré ensuite) ; `onnxruntime` CPU est exclu par `override-dependencies`, car il écraserait `onnxruntime-gpu`.

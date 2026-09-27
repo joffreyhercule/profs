@@ -16,7 +16,7 @@ Tout tourne sur la machine, sur un GPU de 24 Go. Les modèles restent chargés e
 
 ## Installation
 
-Il faut Windows 11, un GPU NVIDIA avec ~21 Go de VRAM libres (testé sur une RTX 5090 Laptop de 24 Go) et un pilote récent compatible CUDA 13, git, et ~30 Go de disque : 24 Go de modèles, 5,5 Go d'environnement Python, 0,7 Go pour llama.cpp.
+Il faut Windows 11, un GPU NVIDIA avec ~23 Go de VRAM libres (testé sur une RTX 5090 Laptop de 24 Go) et un pilote récent compatible CUDA 13, git, et ~30 Go de disque : 24 Go de modèles, 5,5 Go d'environnement Python, 0,7 Go pour llama.cpp.
 
 ```powershell
 git clone https://github.com/joffreyhercule/profs
@@ -38,7 +38,7 @@ Les voix de Claire et de Basile sont fournies dans `data\voices\`. `design_voice
 
 Double-clique sur `run.bat`, ou lance `.\run.bat` dans un terminal. Pour l'avoir sur le bureau : clic droit sur `run.bat` > Afficher d'autres options > Envoyer vers > Bureau (créer un raccourci).
 
-Le script vérifie qu'il reste ~21 Go de VRAM libres (décharge ComfyUI ou tout autre modèle avant), charge tout, puis ouvre http://127.0.0.1:8765. Arrête le prof avec **Ctrl+C** dans sa fenêtre : si tu la fermes avec la croix, llama-server continue de tourner en arrière-plan et garde sa VRAM (`Get-Process llama-server | Stop-Process` pour l'arrêter). Choisis ou crée ton profil, choisis ta matière, puis « Commencer la séance ». Le navigateur retient ton dernier choix.
+Le script vérifie qu'il reste ~23 Go de VRAM libres (décharge ComfyUI ou tout autre modèle avant), charge tout, puis ouvre http://127.0.0.1:8765. Arrête le prof avec **Ctrl+C** dans sa fenêtre : si tu la fermes avec la croix, llama-server continue de tourner en arrière-plan et garde sa VRAM (`Get-Process llama-server | Stop-Process` pour l'arrêter). Choisis ou crée ton profil, choisis ta matière, puis « Commencer la séance ». Le navigateur retient ton dernier choix.
 
 - **Mains libres** : parle, le prof répond dès que tu as fini ta phrase. Parle par-dessus lui pour l'interrompre.
 - **Espace maintenue** (ou le bouton micro en mode « Appuyer pour parler ») : la fin de tour est immédiate au relâchement, c'est la latence la plus basse.
@@ -78,7 +78,7 @@ $env:PROFS_DB = "data\bench.db"; $env:PROFS_NO_BROWSER = "1"; .\.venv\Scripts\py
 | p95 | 385 ms | ~1,4 s (quand smart-turn juge la phrase inachevée, on attend 1,5 s de silence) |
 | Trous dans l'audio | aucun | aucun |
 
-VRAM totale : 21,9 Go. Détection des fautes : 87/90 ; aucune surcorrection sur 45 phrases justes.
+VRAM totale : 22,8 Go (contexte du LLM de 12 288 tokens). Détection des fautes : 87/90 ; aucune surcorrection sur 45 phrases justes.
 
 Ce qui a compté, dans l'ordre :
 

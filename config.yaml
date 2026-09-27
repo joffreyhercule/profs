@@ -12,7 +12,9 @@ llm:
   port: 8766
   model: { repo: google/gemma-4-26B-A4B-it-qat-q4_0-gguf, file: gemma-4-26B_q4_0-it.gguf }
   draft: { repo: unsloth/gemma-4-26B-A4B-it-qat-GGUF, file: mtp-gemma-4-26B-A4B-it.gguf }
-  ctx: 8192
+  # Contexte : consignes + mémoire + historique de la séance + réponse. Chaque token coûte ~220 Ko de VRAM
+  # (KV F16, SWA en taille pleine pour réutiliser le préfixe) : 12288 = 2,6 Go.
+  ctx: 12288
   # KV cache laissé en F16 : Gemma 4 26B-A4B se dégrade nettement en q8/q4.
   args: [-ngl, "99", -np, "1", --swa-full, -fa, "on", --reasoning, "off", --jinja,
          --spec-type, draft-mtp, --spec-draft-n-max, "2", -ngld, "99"]
@@ -57,4 +59,6 @@ tts:
 memory:
   db: data/profs.db
   top_errors: 8
-  history_token_budget: 5000
+  recent_sessions: 3              # résumés des dernières séances donnés au prof
+  mastered_after_sessions: 3      # une erreur absente de 3 séances terminées est considérée comme acquise
+  # L'historique de la séance est coupé de moitié quand le tour suivant risque de dépasser llm.ctx.

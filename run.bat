@@ -20,8 +20,8 @@ REM Un llama-server resté d'une séance précédente est réutilisé : sa VRAM 
 tasklist /fi "imagename eq llama-server.exe" | find /i "llama-server.exe" >nul && goto :serve
 set FREE=0
 for /f %%v in ('nvidia-smi --query-gpu^=memory.free --format^=csv^,noheader^,nounits') do set FREE=%%v
-if %FREE% GEQ 21000 goto :serve
-echo Seulement %FREE% Mo de VRAM libres : il en faut ~21 000. Décharge ComfyUI ou tout autre modèle, puis relance.
+if %FREE% GEQ 22800 goto :serve
+echo Seulement %FREE% Mo de VRAM libres : il en faut ~22 800. Décharge ComfyUI ou tout autre modèle, puis relance.
 goto :end
 
 :serve

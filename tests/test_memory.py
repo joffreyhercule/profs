@@ -1,3 +1,4 @@
+import json
 import sqlite3
 
 from server.memory.db import LEGACY_USER_NAME, MemoryDB
@@ -15,7 +16,7 @@ def test_first_session_has_empty_memory():
     uid = db.create_user("Léa")
     sid = db.start_session(uid, EN)
     assert memory_block(db, uid, EN) == ""
-    assert summary_prompt(db, SUBJECTS[EN], sid) is None
+    assert summary_prompt(db, SUBJECTS[EN], uid, sid) is None
 
 
 def test_errors_accumulate_across_sessions_and_feed_next_prompt():
@@ -26,7 +27,7 @@ def test_errors_accumulate_across_sessions_and_feed_next_prompt():
     db.add_turn(s1, "assistant", "We say I went.")
     db.add_errors(uid, EN, s1, t1, [FIX])
     db.add_errors(uid, EN, s1, t1, [FIX])
-    prompt = summary_prompt(db, SUBJECTS[EN], s1)
+    prompt = summary_prompt(db, SUBJECTS[EN], uid, s1)
     assert "Learner: yesterday I goed to school" in prompt and "past_simple_irregular" in prompt
     apply_summary(db, uid, EN, s1, 'Voici : {"summary": "On a parlé de l\'école.", "level": "b1", "notes": "Likes football."}')
 
@@ -40,6 +41,54 @@ def test_errors_accumulate_across_sessions_and_feed_next_prompt():
     assert "Likes football." in block
     assert "On a parlé de l'école." in block
     assert '"I goed" -> "I went"' in block
+
+
+def finished_session(db, uid, summary, fixes=(), notes=None):
+    sid = db.start_session(uid, EN)
+    db.add_turn(sid, "user", "hello")
+    if fixes:
+        db.add_errors(uid, EN, sid, None, list(fixes))
+    apply_summary(db, uid, EN, sid, json.dumps({"summary": summary, "level": "B1", "notes": notes}))
+    return sid
+
+
+def test_teacher_sees_the_last_three_session_summaries():
+    db = MemoryDB(":memory:")
+    uid = db.create_user("Léa")
+    for i in range(1, 5):
+        finished_session(db, uid, f"Séance {i}.")
+    block = memory_block(db, uid, EN, recent_sessions=3)
+    assert "Séance 1." not in block
+    assert block.index("Séance 4.") < block.index("Séance 3.") < block.index("Séance 2.")
+
+
+def test_mistake_not_repeated_for_three_sessions_is_mastered_until_it_comes_back():
+    db = MemoryDB(":memory:")
+    uid = db.create_user("Léa")
+    finished_session(db, uid, "Passé simple.", [FIX])
+    for i in range(2):
+        finished_session(db, uid, f"Sans faute {i}.")
+    assert db.top_errors(uid, EN, mastered_after=3)[0]["rule_key"] == "past_simple_irregular"
+
+    finished_session(db, uid, "Sans faute 3.")
+    assert db.top_errors(uid, EN, mastered_after=3) == []
+    assert db.top_errors(uid, EN)  # l'historique complet reste en base
+    block = memory_block(db, uid, EN, mastered_after=3)
+    assert "Mastered" in block and "past_simple_irregular" in block and "Recurring" not in block
+
+    sid = db.start_session(uid, EN)  # l'élève refait la faute : elle redevient à revoir
+    db.add_errors(uid, EN, sid, None, [FIX])
+    assert db.top_errors(uid, EN, mastered_after=3)[0]["sessions"] == 2
+
+
+def test_end_of_session_summary_updates_previous_notes():
+    db = MemoryDB(":memory:")
+    uid = db.create_user("Léa")
+    finished_session(db, uid, "Football.", notes="Loves football; practise the past simple.")
+    sid = db.start_session(uid, EN)
+    db.add_turn(sid, "user", "I went to the stadium")
+    prompt = summary_prompt(db, SUBJECTS[EN], uid, sid)
+    assert "- level: B1" in prompt and "- notes: Loves football; practise the past simple." in prompt
 
 
 def test_memory_is_separate_per_learner_and_per_subject():

@@ -33,8 +33,9 @@ class Subject:
                    + (memory_block or self.first_session))
         return self.prompt.replace("{teacher}", self.teacher).rstrip() + "\n\n" + learner
 
-    def summary_prompt(self, transcript: str, mistakes: str) -> str:
-        return self.summary.replace("{transcript}", transcript).replace("{mistakes}", mistakes)
+    def summary_prompt(self, transcript: str, mistakes: str, previous: str) -> str:
+        return (self.summary.replace("{transcript}", transcript).replace("{mistakes}", mistakes)
+                .replace("{previous}", previous))
 
     def public(self) -> dict:
         return {"id": self.id, "title": self.title, "teacher": self.teacher, "description": self.description,

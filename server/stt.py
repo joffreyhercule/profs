@@ -18,6 +18,12 @@ SAMPLE_RATE = 16000
 # Allocation au plus juste : ~0,5 Go de VRAM économisés par rapport aux réglages par défaut
 CUDA_OPTIONS = {"arena_extend_strategy": "kSameAsRequested", "cudnn_conv_algo_search": "HEURISTIC",
                 "cudnn_conv_use_max_workspace": "0"}
+# La réserve mémoire d'onnxruntime garde une zone par taille d'entrée. En mains libres, l'énoncé en
+# cours est retranscrit toutes les ~300 ms en s'allongeant : un énoncé de 45 s ajoutait +21 Go de
+# VRAM (mesuré), qui débordaient en RAM système et ralentissaient tout le GPU (LLM à 6 tokens/s).
+# On rend donc au GPU, après chaque appel, les zones inutilisées : ~+3 ms par transcription.
+SHRINK_ARENA = ort.RunOptions()
+SHRINK_ARENA.add_run_config_entry("memory.enable_memory_arena_shrinkage", "gpu:0")
 
 
 class ParakeetSTT:
@@ -36,6 +42,20 @@ class ParakeetSTT:
         self.providers = self.model.asr._encoder.get_providers()
         if "CUDAExecutionProvider" not in self.providers:
             log.warning("STT sur CPU (%s) : la latence sera mauvaise", self.providers)
+        else:
+            # les deux sessions dont la taille d'entrée suit la durée de l'audio (le décodeur, lui,
+            # avance trame par trame avec des tailles fixes)
+            preprocessor = getattr(self.model.asr._preprocessor, "_preprocessor", None)
+            for session in (self.model.asr._encoder, preprocessor):
+                if isinstance(session, ort.InferenceSession):
+                    self._shrink_after_run(session)
+
+    @staticmethod
+    def _shrink_after_run(session: ort.InferenceSession) -> None:
+        """onnx_asr appelle session.run sans options : on les ajoute."""
+        run = session.run
+        session.run = lambda output_names, input_feed, run_options=None: run(output_names, input_feed,
+                                                                             SHRINK_ARENA)
 
     def transcribe(self, audio: np.ndarray) -> str:
         """audio : float32 mono 16 kHz."""

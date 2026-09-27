@@ -133,7 +133,8 @@ def session_detail(session_id: int) -> dict:
 @app.get("/api/stats")
 def stats(user: int, subject: str) -> dict:
     db = state["engines"].db
-    return {"top_errors": [dict(r) for r in db.top_errors(user, subject, 15)],
+    mastered_after = CFG["memory"]["mastered_after_sessions"]
+    return {"top_errors": [dict(r) for r in db.top_errors(user, subject, 15, mastered_after)],
             "profile": db.get_profile(user, subject), "vram_gb": vram_used_gb()}
 
 

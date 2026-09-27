@@ -105,11 +105,14 @@ class LLMClient:
         self.format = ChatFormat(resp.json()["prompt"])
         return self.format
 
-    async def stream_prompt(self, prompt: str, max_tokens: int | None = None) -> AsyncIterator[str]:
+    async def stream_prompt(self, prompt: str, max_tokens: int | None = None, usage: dict | None = None,
+                            stop: list[str] | None = None) -> AsyncIterator[str]:
         """Complétion brute d'un prompt déjà formaté. Fermer le générateur (aclose) coupe la
-        connexion, ce qui arrête la génération côté llama-server."""
+        connexion, ce qui arrête la génération côté llama-server. Si la génération va à son terme,
+        usage["tokens"] reçoit le contexte occupé (prompt + réponse), compté par llama-server.
+        Le mot d'arrêt rencontré (stop) est renvoyé en dernier : la sortie reste celle du modèle."""
         body = {"prompt": prompt, "stream": True, "temperature": self.temperature,
-                "n_predict": max_tokens or self.max_tokens, "cache_prompt": True}
+                "n_predict": max_tokens or self.max_tokens, "cache_prompt": True, "stop": stop or []}
         async with self.http.stream("POST", self.completion_url, json=body) as resp:
             resp.raise_for_status()
             async for line in resp.aiter_lines():
@@ -119,6 +122,10 @@ class LLMClient:
                 if data.get("content"):
                     yield data["content"]
                 if data.get("stop"):
+                    if data.get("stop_type") == "word" and data.get("stopping_word"):
+                        yield data["stopping_word"]
+                    if usage is not None and "tokens_evaluated" in data:
+                        usage["tokens"] = data["tokens_evaluated"] + data.get("tokens_predicted", 0)
                     return
 
     async def prime_prompt(self, prompt: str) -> None:

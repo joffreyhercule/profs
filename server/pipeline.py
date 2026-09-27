@@ -33,6 +33,9 @@ from server.vad import FRAME, SAMPLE_RATE, SileroVAD, SmartTurn
 log = logging.getLogger("profs.pipeline")
 
 FRAME_MS = FRAME * 1000 / SAMPLE_RATE
+# Place gardée dans le contexte du LLM pour le message suivant de l'élève (un énoncé de 45 s fait
+# ~200 tokens) et les balises du modèle de chat, en plus de la réponse (llm.max_tokens).
+NEXT_TURN_TOKENS = 600
 _background: set[asyncio.Task] = set()
 
 
@@ -74,6 +77,7 @@ class Turn:
         self.played: set[int] = set()
         self.reply: ParsedReply | None = None
         self.raw = ""  # sortie brute du LLM, balises comprises
+        self.ctx_tokens: int | None = None  # contexte du LLM occupé en fin de tour, compté par llama-server
         self.first_chunk = asyncio.Event()  # premier morceau audio produit par le TTS
         self.stt_future: asyncio.Future | None = None
         self.cancelled = self.interrupted = self.committed = self.finished = False
@@ -130,7 +134,9 @@ class Session:
         self.user_id = user_id
         self.subject = eng.subjects[subject]
         self.session_id: int | None = None  # créée au démarrage de la séance, pas à la connexion
-        self.memory = memory_block(self.db, user_id, subject, self.cfg["memory"]["top_errors"])
+        mcfg = self.cfg["memory"]
+        self.memory = memory_block(self.db, user_id, subject, mcfg["top_errors"], mcfg["recent_sessions"],
+                                   mcfg["mastered_after_sessions"])
         self.system = self.subject.system_prompt(self.memory, self.db.get_user(user_id)["name"])
         self.history: list[dict] = []
         self.need_prime = False
@@ -380,7 +386,11 @@ class Session:
     async def generate(self, turn: Turn, parser: ReplyParser, prompt: str, pause_at_first_segment: bool) -> bool:
         """Fait avancer la réponse. Renvoie True si on s'est arrêté après le premier segment
         (le LLM libère le GPU pour que la voix produise son premier son plus vite)."""
-        stream = self.eng.llm.stream_prompt(prompt)
+        usage: dict = {}
+        # Arrêt net après </fix> : passé ~7 000 tokens de contexte, Gemma enchaînait des « <fix>[]</fix> »
+        # jusqu'à max_tokens (3,5 s de génération contre la voix : trous audio), et l'historique, qui garde
+        # la sortie brute, entretenait la dérive (mesuré : 17 réponses sur 120).
+        stream = self.eng.llm.stream_prompt(prompt, usage=usage, stop=["</fix>"])
         try:
             async for delta in stream:
                 turn.mark("llm_first_token")
@@ -394,6 +404,7 @@ class Session:
                     return True
         finally:
             await stream.aclose()  # coupe la connexion : llama-server arrête de générer
+            turn.ctx_tokens = usage.get("tokens", turn.ctx_tokens)
         return False
 
     async def run_turn(self, turn: Turn) -> None:
@@ -496,7 +507,7 @@ class Session:
         lat = turn.latencies()
         self.db.add_metrics(self.session_id, {"turn": turn.id, **lat})
         self.send({"type": "metrics", "turn": turn.id, "latency_ms": lat})
-        self.trim_history()
+        self.trim_history(turn.ctx_tokens)
 
     @staticmethod
     def interrupted_reply(turn: Turn, said: str) -> str:
@@ -522,11 +533,14 @@ class Session:
         self.history.append(entry)
         return entry
 
-    def trim_history(self) -> None:
-        """Au-delà du budget, on retire d'un coup la moitié la plus ancienne (le préfixe change
-        rarement), puis on réchauffe le cache quand le prof a fini de parler."""
-        budget = self.cfg["memory"]["history_token_budget"]
-        if sum(len(m["content"]) for m in self.history) / 3.5 <= budget:
+    def trim_history(self, used: int | None) -> None:
+        """Si le tour suivant risque de ne plus tenir dans le contexte du LLM, on retire d'un coup la moitié
+        la plus ancienne de l'historique (le préfixe change rarement), puis on réchauffe le cache quand le
+        prof a fini de parler. used : contexte occupé à la fin de ce tour, compté par llama-server."""
+        lcfg = self.cfg["llm"]
+        if used is None:  # tour interrompu avant la fin : estimation prudente (~3 caractères par token)
+            used = (len(self.system) + sum(len(m["content"]) for m in self.history)) // 3
+        if used + NEXT_TURN_TOKENS + lcfg["max_tokens"] <= lcfg["ctx"]:
             return
         cut = len(self.history) // 2
         while cut < len(self.history) and self.history[cut]["role"] != "user":
@@ -544,7 +558,7 @@ class Session:
         summary = {}
         if self.session_id is None:  # page quittée avant de commencer
             return
-        prompt = summary_prompt(self.db, self.subject, self.session_id)
+        prompt = summary_prompt(self.db, self.subject, self.user_id, self.session_id)
         if prompt:
             try:
                 out = await self.eng.llm.complete([{"role": "user", "content": prompt}], max_tokens=400)

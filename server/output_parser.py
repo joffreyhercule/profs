@@ -16,6 +16,9 @@ from dataclasses import dataclass, field
 LANGS = ("en", "fr")
 # Types par défaut (anglais) ; chaque matière fournit les siens (subjects/*.yaml)
 FIX_TYPES = ("grammar", "conjugation", "vocabulary", "word_order", "preposition", "false_friend")
+# Mot mal écrit par le STT (« le chaîne » pour le chêne). Le LLM relève ces mots quoi qu'on lui dise ;
+# on lui donne donc un type pour les ranger, et on les écarte : ni affichés, ni comptés en mémoire.
+TRANSCRIPTION = "transcription"
 _LANG_ATTR = re.compile(r"""lang\s*=\s*["']?(en|fr)""", re.IGNORECASE)
 _TAG = re.compile(r"</?\s*(say|fix|en|fr)\b[^>]*>", re.IGNORECASE)
 _HARD_END = ".!?…"
@@ -222,6 +225,8 @@ class ReplyParser:
             if not isinstance(it, dict) or not it.get("original") or not it.get("corrected"):
                 continue
             kind = str(it.get("type", "grammar")).lower()
+            if kind == TRANSCRIPTION:
+                continue
             fixes.append({
                 "type": kind if kind in self.fix_types else self.fix_types[0],
                 "original": str(it["original"]),
